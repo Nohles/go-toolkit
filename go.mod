@@ -1,6 +1,6 @@
 module github.com/readium/go-toolkit
 
-go 1.25.0
+go 1.26.0
 
 require (
 	cloud.google.com/go/storage v1.62.2
@@ -21,6 +21,7 @@ require (
 	github.com/pdfcpu/pdfcpu v0.12.1
 	github.com/pkg/errors v0.9.1
 	github.com/relvacode/iso8601 v1.7.0
+	github.com/simonhull/audiometa v0.10.0
 	github.com/stretchr/testify v1.11.1
 	github.com/trimmer-io/go-xmp v1.0.0
 	go4.org v0.0.0-20230225012048-214862532bf5

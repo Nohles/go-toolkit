@@ -60,16 +60,34 @@ func (p AudioParser) Parse(ctx context.Context, asset asset.PublicationAsset, fe
 		title = asset.Name()
 	}
 
+	enrichment, err := inspectAudioPublication(ctx, fetcher, readingOrder)
+	if err != nil {
+		return nil, err
+	}
+	readingOrder = enrichment.enrichReadingOrder(readingOrder)
+
 	manifest := manifest.Manifest{
 		Context: manifest.Strings{manifest.WebpubManifestContext},
 		Metadata: manifest.Metadata{
 			LocalizedTitle: manifest.NewLocalizedStringFromString(title),
 			ConformsTo:     manifest.Profiles{manifest.ProfileAudiobook},
 		},
-		ReadingOrder: readingOrder,
+		ReadingOrder:    readingOrder,
+		TableOfContents: enrichment.tableOfContents(readingOrder),
+	}
+	enrichment.enrichMetadata(&manifest.Metadata, title, len(readingOrder))
+	if cover := enrichment.coverLink(); cover != nil {
+		manifest.Links = append(manifest.Links, *cover)
 	}
 
-	return pub.NewBuilder(manifest, fetcher, nil), nil // TODO services!
+	services := map[pub.ServiceName]pub.ServiceFactory{
+		pub.PositionsService_Name: pub.PerResourcePositionsServiceFactory(mediatype.MustNewOfString("audio/*")),
+	}
+	if enrichment.cover != nil {
+		services[pub.CoverService_Name] = enrichment.coverServiceFactory()
+	}
+	builder := pub.NewServicesBuilder(services)
+	return pub.NewBuilder(manifest, fetcher, builder), nil
 }
 
 var allowed_extensions_audio_extra = map[string]struct{}{
