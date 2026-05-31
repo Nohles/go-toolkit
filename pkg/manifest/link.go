@@ -3,9 +3,9 @@ package manifest
 import (
 	"encoding/json"
 
-	"github.com/pkg/errors"
 	"github.com/nohles/go-toolkit/pkg/mediatype"
 	"github.com/nohles/go-toolkit/pkg/util/url"
+	"github.com/pkg/errors"
 )
 
 // Link
@@ -279,6 +279,16 @@ func (ll LinkList) FilterByMediaType(mt ...*mediatype.MediaType) LinkList {
 func (ll LinkList) AllAreBitmap() bool {
 	for _, link := range ll {
 		if !link.MediaType.IsBitmap() {
+			return false
+		}
+	}
+	return true
+}
+
+// Returns whether all the resources in the collection are comic book archives.
+func (ll LinkList) AllAreComicArchives() bool {
+	for _, link := range ll {
+		if !link.MediaType.IsComicArchive() {
 			return false
 		}
 	}

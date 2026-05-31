@@ -6,6 +6,7 @@ import (
 	"github.com/nohles/go-toolkit/pkg/archive"
 	"github.com/nohles/go-toolkit/pkg/asset"
 	"github.com/nohles/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/mediatype"
 	"github.com/nohles/go-toolkit/pkg/pub"
 	"github.com/nohles/go-toolkit/pkg/util/url"
 	"github.com/stretchr/testify/assert"
@@ -61,6 +62,53 @@ func TestImageReadingOrderAlphabetical(t *testing.T) {
 			"a-fc.jpg", "x-002.jpg", "x-003.jpg", "x-004.jpg",
 		}, hrefs, "readingOrder should be sorted alphabetically")
 	})
+}
+
+func TestImageComicArchiveFolderReadingOrderAndTOC(t *testing.T) {
+	a := staticAsset{mediaType: mediatype.Binary}
+	f := staticLinksFetcher{
+		links: manifest.LinkList{
+			{Href: manifest.MustNewHREFFromString("Chapter 10.cbz", false), MediaType: &mediatype.CBZ},
+			{Href: manifest.MustNewHREFFromString("ComicInfo.xml", false), MediaType: &mediatype.XML},
+			{Href: manifest.MustNewHREFFromString("Chapter 2.cbr", false)},
+			{Href: manifest.MustNewHREFFromString("Chapter 1.cbz", false)},
+		},
+	}
+
+	builder, err := ImageParser{}.Parse(t.Context(), a, f)
+	require.NoError(t, err)
+	require.NotNil(t, builder)
+
+	pub := builder.Build()
+	require.Len(t, pub.Manifest.ReadingOrder, 3)
+	assert.Equal(t, "Chapter%201.cbz", pub.Manifest.ReadingOrder[0].Href.String())
+	assert.Equal(t, "Chapter%202.cbr", pub.Manifest.ReadingOrder[1].Href.String())
+	assert.Equal(t, "Chapter%2010.cbz", pub.Manifest.ReadingOrder[2].Href.String())
+	assert.Equal(t, &mediatype.CBZ, pub.Manifest.ReadingOrder[0].MediaType)
+	assert.Equal(t, &mediatype.CBR, pub.Manifest.ReadingOrder[1].MediaType)
+	assert.Empty(t, pub.Manifest.ReadingOrder[0].Rels)
+	assert.True(t, pub.Manifest.ConformsTo(manifest.ProfileDivina))
+
+	require.Len(t, pub.Manifest.TableOfContents, 3)
+	assert.Equal(t, "Chapter 1", pub.Manifest.TableOfContents[0].Title)
+	assert.Equal(t, "Chapter 2", pub.Manifest.TableOfContents[1].Title)
+	assert.Equal(t, "Chapter 10", pub.Manifest.TableOfContents[2].Title)
+	assert.Equal(t, pub.Manifest.ReadingOrder[0].Href.String(), pub.Manifest.TableOfContents[0].Href.String())
+	assert.Equal(t, &mediatype.CBZ, pub.Manifest.TableOfContents[0].MediaType)
+}
+
+func TestImageComicArchiveFolderRejectsUnsupportedEntries(t *testing.T) {
+	a := staticAsset{mediaType: mediatype.Binary}
+	f := staticLinksFetcher{
+		links: manifest.LinkList{
+			{Href: manifest.MustNewHREFFromString("Chapter 1.cbz", false), MediaType: &mediatype.CBZ},
+			{Href: manifest.MustNewHREFFromString("notes.pdf", false), MediaType: &mediatype.PDF},
+		},
+	}
+
+	builder, err := ImageParser{}.Parse(t.Context(), a, f)
+	require.NoError(t, err)
+	assert.Nil(t, builder)
 }
 
 func TestImageCoverFirstItem(t *testing.T) {

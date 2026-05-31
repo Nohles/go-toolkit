@@ -298,6 +298,11 @@ func (mt MediaType) IsBitmap() bool {
 	return mt.Matches(&BMP, &GIF, &JPEG, &PNG, &TIFF, &WEBP, &AVIF, &JXL)
 }
 
+// Returns whether this media type is of a comic book archive.
+func (mt MediaType) IsComicArchive() bool {
+	return mt.Matches(&CBZ, &CBR)
+}
+
 // Returns whether this media type is of an image.
 func (mt MediaType) IsImage() bool {
 	return mt.Type == "image"
@@ -321,7 +326,7 @@ func (mt MediaType) IsRwpm() bool {
 // Returns whether this media type is of a publication file.
 func (mt MediaType) IsPublication() bool {
 	return mt.Matches(
-		&ReadiumAudiobook, &ReadiumAudiobookManifest, &CBZ, &ReadiumDivina, &ReadiumDivinaManifest, &EPUB, &LCPProtectedAudiobook,
+		&ReadiumAudiobook, &ReadiumAudiobookManifest, &CBZ, &CBR, &ReadiumDivina, &ReadiumDivinaManifest, &EPUB, &LCPProtectedAudiobook,
 		&LCPProtectedPDF, &LPF, &PDF, &W3CWPUBManifest, &ReadiumWebpub, &ReadiumWebpubManifest, &ZAB,
 	)
 }

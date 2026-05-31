@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"slices"
 
-	"github.com/pkg/errors"
 	"github.com/nohles/go-toolkit/pkg/internal/extensions"
 	"github.com/nohles/go-toolkit/pkg/mediatype"
 	"github.com/nohles/go-toolkit/pkg/util/url"
+	"github.com/pkg/errors"
 )
 
 const WebpubManifestContext = "https://readium.org/webpub-manifest/context.jsonld"
@@ -33,7 +33,7 @@ func (m Manifest) ConformsTo(profile Profile) bool {
 	case ProfileAudiobook:
 		return m.ReadingOrder.AllAreAudio()
 	case ProfileDivina:
-		return m.ReadingOrder.AllAreBitmap()
+		return m.ReadingOrder.AllAreBitmap() || m.ReadingOrder.AllAreComicArchives()
 	case ProfileEPUB:
 		// EPUB needs to be explicitly indicated in `conformsTo`, otherwise it could be a regular Web Publication.
 		if slices.Contains(m.Metadata.ConformsTo, ProfileEPUB) && m.ReadingOrder.AllAreHTML() {

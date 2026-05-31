@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 **Warning:** Features marked as *alpha* may change or be removed in a future release without notice. Use with caution.
 
+## Unreleased
+
+### Added
+
+- Added folder-level comic archive manifests, with CBZ/CBR chapters naturally sorted into reading order and exposed in the table of contents using relative chapter hrefs.
+- Added audiobook metadata enrichment from audio tags, including title, subtitle, description, language, publisher, authors, narrators, subjects, publication date, duration, bitrate, embedded cover art, and chapter-based table of contents.
+- Added media type sniffing for `.m4a`, `.m4b`, and `.flac` audio files.
+
+### Changed
+
+- Audiobook reading order now uses natural numeric sorting, so numbered tracks such as `1`, `2`, and `10` stay in playback order.
+- Audiobook parsing now tolerates common sidecar files such as `.rtf`, `.mobi`, `.pdf`, `.json`, `.cue`, and playlist files while still requiring at least one audio resource.
+
+### Fixed
+
+- Fixed folder-level comic chapter hrefs so publication servers can resolve chapter CBZ/CBR assets relative to the manifest URL.
+- Fixed panics when parser candidates encountered links without a detected media type.
+- Fixed missing `type` values on `.m4a` and `.m4b` reading-order links generated from local files.
+
 ## [0.13.4] - 2026-03-09
 
 ### Changed

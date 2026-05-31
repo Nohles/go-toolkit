@@ -461,6 +461,23 @@ func TestMediatypeIsBitmap(t *testing.T) {
 	}
 }
 
+func TestMediatypeIsComicArchive(t *testing.T) {
+	mt, err := NewOfString("text/html")
+	require.NoError(t, err)
+	assert.False(t, mt.IsComicArchive())
+
+	for _, r := range []string{
+		"application/vnd.comicbook+zip",
+		"application/vnd.comicbook-rar",
+		"application/x-cbz",
+		"application/x-cbr",
+	} {
+		mtp := OfString(r)
+		require.NotNil(t, mtp)
+		assert.True(t, mtp.IsComicArchive(), r+" should be a comic archive")
+	}
+}
+
 func TestMediatypeIsAudio(t *testing.T) {
 	mt, err := NewOfString("text/html")
 	require.NoError(t, err)
@@ -526,6 +543,7 @@ func TestMediatypeIsPublication(t *testing.T) {
 		"application/webpub+zip",
 		"application/webpub+json",
 		"application/vnd.comicbook+zip",
+		"application/vnd.comicbook-rar",
 		"application/epub+zip",
 		"application/lpf+zip",
 		"application/pdf",

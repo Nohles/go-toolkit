@@ -21,14 +21,27 @@ type ImageParser struct{}
 
 // Parse implements PublicationParser
 func (p ImageParser) Parse(ctx context.Context, asset asset.PublicationAsset, fetcher fetcher.Fetcher) (*pub.Builder, error) {
-	if ok, err := p.accepts(ctx, asset, fetcher); err != nil || !ok {
-		return nil, err
-	}
-
 	links, err := fetcher.Links(ctx)
 	if err != nil {
 		return nil, err
 	}
+
+	if asset.MediaType(ctx).IsComicArchive() {
+		return p.parseImagePublication(ctx, asset, fetcher, links)
+	}
+
+	if readingOrder, ok := comicArchiveReadingOrder(links); ok {
+		return p.parseComicArchivePublication(ctx, asset, fetcher, readingOrder), nil
+	}
+
+	if !acceptsImageLinks(links) {
+		return nil, nil
+	}
+
+	return p.parseImagePublication(ctx, asset, fetcher, links)
+}
+
+func (p ImageParser) parseImagePublication(ctx context.Context, asset asset.PublicationAsset, fetcher fetcher.Fetcher, links manifest.LinkList) (*pub.Builder, error) {
 	readingOrder := make(manifest.LinkList, 0, len(links))
 	for _, link := range links {
 		path := link.URL(nil, nil).Path()
@@ -76,13 +89,20 @@ func (p ImageParser) Parse(ctx context.Context, asset asset.PublicationAsset, fe
 var allowed_extensions_image = map[string]struct{}{"acbf": {}, "xml": {}, "txt": {}, "json": {}}
 
 func (p ImageParser) accepts(ctx context.Context, asset asset.PublicationAsset, fetcher fetcher.Fetcher) (bool, error) {
-	if asset.MediaType(ctx).Equal(&mediatype.CBZ) || asset.MediaType(ctx).Equal(&mediatype.CBR) {
+	if asset.MediaType(ctx).IsComicArchive() {
 		return true, nil
 	}
 	links, err := fetcher.Links(ctx)
 	if err != nil {
 		return false, err
 	}
+	if _, ok := comicArchiveReadingOrder(links); ok {
+		return true, nil
+	}
+	return acceptsImageLinks(links), nil
+}
+
+func acceptsImageLinks(links manifest.LinkList) bool {
 	for _, link := range links {
 		path := link.URL(nil, nil).Path()
 
@@ -98,8 +118,102 @@ func (p ImageParser) accepts(ctx context.Context, asset asset.PublicationAsset, 
 		}
 		_, contains := allowed_extensions_image[fext]
 		if !contains {
-			return false, nil
+			return false
 		}
 	}
-	return true, nil
+	return true
+}
+
+func (p ImageParser) parseComicArchivePublication(ctx context.Context, asset asset.PublicationAsset, fetcher fetcher.Fetcher, readingOrder manifest.LinkList) *pub.Builder {
+	title := guessPublicationTitleFromFileStructure(ctx, fetcher)
+	if title == "" {
+		title = asset.Name()
+	}
+
+	manifest := manifest.Manifest{
+		Context: manifest.Strings{manifest.WebpubManifestContext},
+		Metadata: manifest.Metadata{
+			LocalizedTitle: manifest.NewLocalizedStringFromString(title),
+			ConformsTo:     manifest.Profiles{manifest.ProfileDivina},
+		},
+		ReadingOrder:    readingOrder,
+		TableOfContents: comicArchiveTableOfContents(readingOrder),
+	}
+
+	builder := pub.NewServicesBuilder(map[pub.ServiceName]pub.ServiceFactory{
+		pub.PositionsService_Name: pub.PerResourcePositionsServiceFactory(mediatype.CBZ),
+	})
+	return pub.NewBuilder(manifest, fetcher, builder)
+}
+
+func comicArchiveReadingOrder(links manifest.LinkList) (manifest.LinkList, bool) {
+	readingOrder := make(manifest.LinkList, 0, len(links))
+	for _, link := range links {
+		path := link.URL(nil, nil).Path()
+
+		if extensions.IsHiddenOrThumbs(path) {
+			continue
+		}
+
+		mt := link.MediaType
+		if mt == nil || mt.Equal(&mediatype.Binary) {
+			mt = mediaTypeForPath(path)
+		}
+		if mt != nil && mt.IsComicArchive() {
+			link.Href = relativePublicationHREF(link.Href)
+			link.MediaType = mt
+			readingOrder = append(readingOrder, link)
+			continue
+		}
+
+		fext := filepath.Ext(strings.ToLower(path))
+		if len(fext) > 1 {
+			fext = fext[1:]
+		}
+		_, contains := allowed_extensions_image[fext]
+		if !contains {
+			return nil, false
+		}
+	}
+	if len(readingOrder) == 0 {
+		return nil, false
+	}
+
+	sort.Slice(readingOrder, func(i, j int) bool {
+		return naturalLess(readingOrder[i].Href.String(), readingOrder[j].Href.String())
+	})
+	return readingOrder, true
+}
+
+func comicArchiveTableOfContents(readingOrder manifest.LinkList) manifest.LinkList {
+	toc := make(manifest.LinkList, len(readingOrder))
+	for i, link := range readingOrder {
+		toc[i] = manifest.Link{
+			Href:      link.Href,
+			MediaType: link.MediaType,
+			Title:     titleFromComicArchiveHref(link),
+		}
+	}
+	return toc
+}
+
+func mediaTypeForPath(path string) *mediatype.MediaType {
+	fext := filepath.Ext(strings.ToLower(path))
+	if len(fext) <= 1 {
+		return nil
+	}
+	return mediatype.OfExtension(fext[1:])
+}
+
+func relativePublicationHREF(href manifest.HREF) manifest.HREF {
+	return manifest.MustNewHREFFromString(strings.TrimPrefix(href.String(), "/"), href.IsTemplated())
+}
+
+func titleFromComicArchiveHref(link manifest.Link) string {
+	title := link.URL(nil, nil).Filename()
+	ext := filepath.Ext(title)
+	if ext != "" {
+		title = strings.TrimSuffix(title, ext)
+	}
+	return strings.TrimSpace(title)
 }
