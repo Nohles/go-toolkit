@@ -3,9 +3,9 @@ package asset
 import (
 	"context"
 
-	"github.com/readium/go-toolkit/pkg/archive"
-	"github.com/readium/go-toolkit/pkg/fetcher"
-	"github.com/readium/go-toolkit/pkg/mediatype"
+	"github.com/nohles/go-toolkit/pkg/archive"
+	"github.com/nohles/go-toolkit/pkg/fetcher"
+	"github.com/nohles/go-toolkit/pkg/mediatype"
 )
 
 type Dependencies struct {

@@ -12,8 +12,8 @@ import (
 	"os"
 
 	"github.com/antchfx/xmlquery"
-	"github.com/readium/go-toolkit/pkg/archive"
-	"github.com/readium/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/archive"
+	"github.com/nohles/go-toolkit/pkg/manifest"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/unicode"
 )

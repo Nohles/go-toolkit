@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/readium/go-toolkit/pkg/archive"
+	"github.com/nohles/go-toolkit/pkg/archive"
 )
 
 type CompressedResource interface {

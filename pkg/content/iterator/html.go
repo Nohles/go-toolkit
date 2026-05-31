@@ -6,10 +6,10 @@ import (
 
 	"github.com/andybalholm/cascadia"
 	"github.com/pkg/errors"
-	"github.com/readium/go-toolkit/pkg/content/element"
-	"github.com/readium/go-toolkit/pkg/fetcher"
-	"github.com/readium/go-toolkit/pkg/manifest"
-	"github.com/readium/go-toolkit/pkg/mediatype"
+	"github.com/nohles/go-toolkit/pkg/content/element"
+	"github.com/nohles/go-toolkit/pkg/fetcher"
+	"github.com/nohles/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/mediatype"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )

@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/readium/go-toolkit/pkg/util/url"
+	"github.com/nohles/go-toolkit/pkg/util/url"
 )
 
 type ArchiveFactory interface {

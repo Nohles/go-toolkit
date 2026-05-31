@@ -5,13 +5,13 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
-	"github.com/readium/go-toolkit/pkg/archive"
-	"github.com/readium/go-toolkit/pkg/asset"
-	"github.com/readium/go-toolkit/pkg/manifest"
-	"github.com/readium/go-toolkit/pkg/parser"
-	"github.com/readium/go-toolkit/pkg/parser/epub"
-	"github.com/readium/go-toolkit/pkg/parser/pdf"
-	"github.com/readium/go-toolkit/pkg/pub"
+	"github.com/nohles/go-toolkit/pkg/archive"
+	"github.com/nohles/go-toolkit/pkg/asset"
+	"github.com/nohles/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/parser"
+	"github.com/nohles/go-toolkit/pkg/parser/epub"
+	"github.com/nohles/go-toolkit/pkg/parser/pdf"
+	"github.com/nohles/go-toolkit/pkg/pub"
 )
 
 // Streamer opens a `Publication` using a list of parsers.

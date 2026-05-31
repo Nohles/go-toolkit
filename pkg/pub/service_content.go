@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/readium/go-toolkit/pkg/content"
-	"github.com/readium/go-toolkit/pkg/content/element"
-	"github.com/readium/go-toolkit/pkg/content/iterator"
-	"github.com/readium/go-toolkit/pkg/fetcher"
-	"github.com/readium/go-toolkit/pkg/manifest"
-	"github.com/readium/go-toolkit/pkg/mediatype"
+	"github.com/nohles/go-toolkit/pkg/content"
+	"github.com/nohles/go-toolkit/pkg/content/element"
+	"github.com/nohles/go-toolkit/pkg/content/iterator"
+	"github.com/nohles/go-toolkit/pkg/fetcher"
+	"github.com/nohles/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/mediatype"
 )
 
 // TODO content iterator special ~readium link

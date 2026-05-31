@@ -1,4 +1,4 @@
-module github.com/readium/go-toolkit
+module github.com/nohles/go-toolkit
 
 go 1.26.0
 

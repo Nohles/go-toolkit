@@ -3,9 +3,9 @@ package parser
 import (
 	"context"
 
-	"github.com/readium/go-toolkit/pkg/asset"
-	"github.com/readium/go-toolkit/pkg/fetcher"
-	"github.com/readium/go-toolkit/pkg/pub"
+	"github.com/nohles/go-toolkit/pkg/asset"
+	"github.com/nohles/go-toolkit/pkg/fetcher"
+	"github.com/nohles/go-toolkit/pkg/pub"
 )
 
 type PublicationParser interface {

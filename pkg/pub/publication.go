@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/readium/go-toolkit/pkg/fetcher"
-	"github.com/readium/go-toolkit/pkg/manifest"
-	"github.com/readium/go-toolkit/pkg/util/url"
+	"github.com/nohles/go-toolkit/pkg/fetcher"
+	"github.com/nohles/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/util/url"
 )
 
 // The Publication shared model is the entrypoint for all the metadata and services related to a Readium publication.

@@ -1,8 +1,8 @@
 package manifest
 
 import (
-	"github.com/readium/go-toolkit/pkg/util/url"
-	"github.com/readium/go-toolkit/pkg/util/url/uritemplates"
+	"github.com/nohles/go-toolkit/pkg/util/url"
+	"github.com/nohles/go-toolkit/pkg/util/url/uritemplates"
 )
 
 // An hypertext reference points to a resource in a [Publication].

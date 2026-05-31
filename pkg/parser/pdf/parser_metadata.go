@@ -8,10 +8,10 @@ import (
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 	"github.com/pkg/errors"
-	"github.com/readium/go-toolkit/pkg/internal/extensions"
-	"github.com/readium/go-toolkit/pkg/manifest"
-	"github.com/readium/go-toolkit/pkg/mediatype"
-	"github.com/readium/go-toolkit/pkg/util/url"
+	"github.com/nohles/go-toolkit/pkg/internal/extensions"
+	"github.com/nohles/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/mediatype"
+	"github.com/nohles/go-toolkit/pkg/util/url"
 	"github.com/trimmer-io/go-xmp/xmp"
 )
 

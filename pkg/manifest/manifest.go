@@ -5,9 +5,9 @@ import (
 	"slices"
 
 	"github.com/pkg/errors"
-	"github.com/readium/go-toolkit/pkg/internal/extensions"
-	"github.com/readium/go-toolkit/pkg/mediatype"
-	"github.com/readium/go-toolkit/pkg/util/url"
+	"github.com/nohles/go-toolkit/pkg/internal/extensions"
+	"github.com/nohles/go-toolkit/pkg/mediatype"
+	"github.com/nohles/go-toolkit/pkg/util/url"
 )
 
 const WebpubManifestContext = "https://readium.org/webpub-manifest/context.jsonld"

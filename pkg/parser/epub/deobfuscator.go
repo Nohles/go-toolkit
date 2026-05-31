@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/readium/go-toolkit/pkg/archive"
-	"github.com/readium/go-toolkit/pkg/fetcher"
+	"github.com/nohles/go-toolkit/pkg/archive"
+	"github.com/nohles/go-toolkit/pkg/fetcher"
 )
 
 var algorithm2length = map[string]int64{

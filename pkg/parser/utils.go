@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/readium/go-toolkit/pkg/fetcher"
-	"github.com/readium/go-toolkit/pkg/manifest"
-	"github.com/readium/go-toolkit/pkg/mediatype"
+	"github.com/nohles/go-toolkit/pkg/fetcher"
+	"github.com/nohles/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/mediatype"
 )
 
 func hrefCommonFirstComponent(links manifest.LinkList) string {

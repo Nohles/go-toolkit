@@ -3,7 +3,7 @@ package parser
 import (
 	"testing"
 
-	"github.com/readium/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/manifest"
 	"github.com/stretchr/testify/assert"
 )
 

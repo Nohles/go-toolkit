@@ -3,7 +3,7 @@ package fetcher
 import (
 	"context"
 
-	"github.com/readium/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/manifest"
 )
 
 // Transforms the resources' content of a child fetcher using a list of [ResourceTransformer] functions.

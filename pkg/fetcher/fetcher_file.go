@@ -11,8 +11,8 @@ import (
 	"strings"
 	"weak"
 
-	"github.com/readium/go-toolkit/pkg/manifest"
-	"github.com/readium/go-toolkit/pkg/mediatype"
+	"github.com/nohles/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/mediatype"
 )
 
 // Provides access to resources on the local file system.

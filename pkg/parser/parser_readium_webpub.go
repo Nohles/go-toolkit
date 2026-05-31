@@ -5,11 +5,11 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
-	"github.com/readium/go-toolkit/pkg/asset"
-	ftchr "github.com/readium/go-toolkit/pkg/fetcher"
-	"github.com/readium/go-toolkit/pkg/manifest"
-	"github.com/readium/go-toolkit/pkg/mediatype"
-	"github.com/readium/go-toolkit/pkg/pub"
+	"github.com/nohles/go-toolkit/pkg/asset"
+	ftchr "github.com/nohles/go-toolkit/pkg/fetcher"
+	"github.com/nohles/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/mediatype"
+	"github.com/nohles/go-toolkit/pkg/pub"
 )
 
 type WebPubParser struct {

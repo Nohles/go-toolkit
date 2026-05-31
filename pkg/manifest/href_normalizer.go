@@ -1,6 +1,6 @@
 package manifest
 
-import "github.com/readium/go-toolkit/pkg/util/url"
+import "github.com/nohles/go-toolkit/pkg/util/url"
 
 // Returns a copy of the receiver after normalizing its HREFs to the link with `rel="self"`.
 func (m Manifest) NormalizeHREFsToSelf() Manifest {

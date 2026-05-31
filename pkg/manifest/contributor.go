@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/pkg/errors"
-	"github.com/readium/go-toolkit/pkg/internal/extensions"
+	"github.com/nohles/go-toolkit/pkg/internal/extensions"
 )
 
 // Contributor

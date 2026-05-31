@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/readium/go-toolkit/pkg/archive"
-	"github.com/readium/go-toolkit/pkg/fetcher"
-	"github.com/readium/go-toolkit/pkg/mediatype"
-	"github.com/readium/go-toolkit/pkg/util/url"
+	"github.com/nohles/go-toolkit/pkg/archive"
+	"github.com/nohles/go-toolkit/pkg/fetcher"
+	"github.com/nohles/go-toolkit/pkg/mediatype"
+	"github.com/nohles/go-toolkit/pkg/util/url"
 )
 
 // Represents a publication stored on an Amazon S3-compatible remote server.

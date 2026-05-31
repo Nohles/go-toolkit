@@ -3,7 +3,7 @@ package fetcher
 import (
 	"context"
 
-	"github.com/readium/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/manifest"
 )
 
 // Fetcher provides access to a Resource from a Link.

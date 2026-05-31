@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/readium/go-toolkit/pkg/fetcher"
-	"github.com/readium/go-toolkit/pkg/manifest"
-	"github.com/readium/go-toolkit/pkg/mediatype"
-	"github.com/readium/go-toolkit/pkg/util/url"
+	"github.com/nohles/go-toolkit/pkg/fetcher"
+	"github.com/nohles/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/mediatype"
+	"github.com/nohles/go-toolkit/pkg/util/url"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

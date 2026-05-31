@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/readium/go-toolkit/pkg/util/url"
+	"github.com/nohles/go-toolkit/pkg/util/url"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/readium/go-toolkit/pkg/fetcher"
-	"github.com/readium/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/fetcher"
+	"github.com/nohles/go-toolkit/pkg/manifest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

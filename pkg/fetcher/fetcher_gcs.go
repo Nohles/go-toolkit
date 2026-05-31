@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"cloud.google.com/go/storage"
-	"github.com/readium/go-toolkit/pkg/manifest"
-	"github.com/readium/go-toolkit/pkg/mediatype"
-	"github.com/readium/go-toolkit/pkg/util/url"
+	"github.com/nohles/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/mediatype"
+	"github.com/nohles/go-toolkit/pkg/util/url"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 )

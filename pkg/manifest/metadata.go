@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/pkg/errors"
-	"github.com/readium/go-toolkit/pkg/internal/util"
-	"github.com/readium/go-toolkit/pkg/util/version"
+	"github.com/nohles/go-toolkit/pkg/internal/util"
+	"github.com/nohles/go-toolkit/pkg/util/version"
 )
 
 // TODO replace with generic
@@ -462,7 +462,7 @@ func (m *Metadata) UnmarshalJSON(b []byte) error {
 }
 
 // If you really don't want the version info in your manifest, you can blank this value.
-var ToolkitVersionKey = "https://github.com/readium/go-toolkit#version"
+var ToolkitVersionKey = "https://github.com/nohles/go-toolkit#version"
 
 func (m Metadata) MarshalJSON() ([]byte, error) {
 	j := make(map[string]interface{})

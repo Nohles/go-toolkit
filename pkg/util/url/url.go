@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/readium/go-toolkit/pkg/internal/extensions"
+	"github.com/nohles/go-toolkit/pkg/internal/extensions"
 	"golang.org/x/net/idna"
 )
 

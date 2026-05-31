@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/readium/go-toolkit/pkg/content/element"
-	"github.com/readium/go-toolkit/pkg/content/iterator"
+	"github.com/nohles/go-toolkit/pkg/content/element"
+	"github.com/nohles/go-toolkit/pkg/content/iterator"
 )
 
 type Content interface {

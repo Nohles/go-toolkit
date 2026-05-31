@@ -6,7 +6,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/readium/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/manifest"
 )
 
 // BytesResource is a Resource serving a lazy-loaded bytes buffer.

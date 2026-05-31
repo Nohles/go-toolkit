@@ -3,7 +3,7 @@ package iterator
 import (
 	"context"
 
-	"github.com/readium/go-toolkit/pkg/content/element"
+	"github.com/nohles/go-toolkit/pkg/content/element"
 )
 
 // Iterates through a list of [Element] items asynchronously.

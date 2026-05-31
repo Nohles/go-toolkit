@@ -3,9 +3,9 @@ package iterator
 import (
 	"context"
 
-	"github.com/readium/go-toolkit/pkg/content/element"
-	"github.com/readium/go-toolkit/pkg/fetcher"
-	"github.com/readium/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/content/element"
+	"github.com/nohles/go-toolkit/pkg/fetcher"
+	"github.com/nohles/go-toolkit/pkg/manifest"
 )
 
 type ResourceContentIteratorFactory = func(fetcher.Resource, manifest.Locator) Iterator

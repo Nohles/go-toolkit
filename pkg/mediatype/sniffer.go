@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/readium/go-toolkit/pkg/internal/extensions"
+	"github.com/nohles/go-toolkit/pkg/internal/extensions"
 )
 
 type Sniffer func(ctx context.Context, context SnifferContext) *MediaType

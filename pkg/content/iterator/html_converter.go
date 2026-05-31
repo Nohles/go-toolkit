@@ -6,11 +6,11 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/readium/go-toolkit/pkg/content/element"
-	iutil "github.com/readium/go-toolkit/pkg/internal/util"
-	"github.com/readium/go-toolkit/pkg/manifest"
-	"github.com/readium/go-toolkit/pkg/mediatype"
-	"github.com/readium/go-toolkit/pkg/util/url"
+	"github.com/nohles/go-toolkit/pkg/content/element"
+	iutil "github.com/nohles/go-toolkit/pkg/internal/util"
+	"github.com/nohles/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/mediatype"
+	"github.com/nohles/go-toolkit/pkg/util/url"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )

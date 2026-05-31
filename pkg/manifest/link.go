@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/pkg/errors"
-	"github.com/readium/go-toolkit/pkg/mediatype"
-	"github.com/readium/go-toolkit/pkg/util/url"
+	"github.com/nohles/go-toolkit/pkg/mediatype"
+	"github.com/nohles/go-toolkit/pkg/util/url"
 )
 
 // Link

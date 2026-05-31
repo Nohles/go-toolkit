@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/readium/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/manifest"
 )
 
 // Note: We can't embed structs/interfaces in the interfaces otherwise they become

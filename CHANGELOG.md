@@ -33,7 +33,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Now that we not longer make full releases on GitHub for the go-toolkit, it's confusing to have `https://github.com/readium/go-toolkit/releases` as the JSON key for the toolkit version in manifests. The new value is `https://github.com/readium/go-toolkit#version`
+- Now that we not longer make full releases on GitHub for the go-toolkit, it's confusing to have `https://github.com/nohles/go-toolkit/releases` as the JSON key for the toolkit version in manifests. The new value is `https://github.com/nohles/go-toolkit#version`
 
 ## [0.13.0] - 2025-12-04
 
@@ -159,7 +159,7 @@ The WebPub data the toolkit parses and provides has been updated to more closely
 
 - Support for [EPUB Accessibility 1.1](https://www.w3.org/TR/epub-a11y-11/) conformance values
 - `--version` flag for `rwp`
-- Output of `go-toolkit` version in WebPub metadata. [Based on the Go module pseudo-version](https://github.com/readium/go-toolkit/issues/80#issuecomment-2673888192)
+- Output of `go-toolkit` version in WebPub metadata. [Based on the Go module pseudo-version](https://github.com/nohles/go-toolkit/issues/80#issuecomment-2673888192)
 
 ### Changed
 

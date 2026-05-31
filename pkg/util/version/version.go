@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-const toolkitRepo = "github.com/readium/go-toolkit"
+const toolkitRepo = "github.com/nohles/go-toolkit"
 
 var Version = "unknown"
 

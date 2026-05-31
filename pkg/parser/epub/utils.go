@@ -7,10 +7,10 @@ import (
 	"github.com/antchfx/xmlquery"
 	"github.com/antchfx/xpath"
 	"github.com/pkg/errors"
-	"github.com/readium/go-toolkit/pkg/fetcher"
-	ftchr "github.com/readium/go-toolkit/pkg/fetcher"
-	"github.com/readium/go-toolkit/pkg/manifest"
-	"github.com/readium/go-toolkit/pkg/util/url"
+	"github.com/nohles/go-toolkit/pkg/fetcher"
+	ftchr "github.com/nohles/go-toolkit/pkg/fetcher"
+	"github.com/nohles/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/util/url"
 )
 
 // xmlNS maps the XML namespace prefixes used by precompiled XPath expressions

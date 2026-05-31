@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/readium/go-toolkit/pkg/internal/extensions"
+	"github.com/nohles/go-toolkit/pkg/internal/extensions"
 )
 
 func parseSliceOrString(value interface{}, deduplicate bool) (result []string, err error) {

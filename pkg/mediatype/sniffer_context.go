@@ -8,8 +8,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/readium/go-toolkit/pkg/archive"
-	"github.com/readium/go-toolkit/pkg/util/url"
+	"github.com/nohles/go-toolkit/pkg/archive"
+	"github.com/nohles/go-toolkit/pkg/util/url"
 	"golang.org/x/text/encoding"
 )
 

@@ -3,11 +3,11 @@ package parser
 import (
 	"testing"
 
-	"github.com/readium/go-toolkit/pkg/archive"
-	"github.com/readium/go-toolkit/pkg/asset"
-	"github.com/readium/go-toolkit/pkg/manifest"
-	"github.com/readium/go-toolkit/pkg/pub"
-	"github.com/readium/go-toolkit/pkg/util/url"
+	"github.com/nohles/go-toolkit/pkg/archive"
+	"github.com/nohles/go-toolkit/pkg/asset"
+	"github.com/nohles/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/pub"
+	"github.com/nohles/go-toolkit/pkg/util/url"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/readium/go-toolkit/pkg/util/url"
+	"github.com/nohles/go-toolkit/pkg/util/url"
 )
 
 type HTTPArchiveFactory struct {

@@ -7,12 +7,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/readium/go-toolkit/pkg/asset"
-	"github.com/readium/go-toolkit/pkg/fetcher"
-	"github.com/readium/go-toolkit/pkg/internal/extensions"
-	"github.com/readium/go-toolkit/pkg/manifest"
-	"github.com/readium/go-toolkit/pkg/mediatype"
-	"github.com/readium/go-toolkit/pkg/pub"
+	"github.com/nohles/go-toolkit/pkg/asset"
+	"github.com/nohles/go-toolkit/pkg/fetcher"
+	"github.com/nohles/go-toolkit/pkg/internal/extensions"
+	"github.com/nohles/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/mediatype"
+	"github.com/nohles/go-toolkit/pkg/pub"
 )
 
 // Handles parsing of audiobooks from an unstructured archive format containing audio files, such as ZAB (Zipped Audio Book) or a simple ZIP.

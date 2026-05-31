@@ -4,9 +4,9 @@ import (
 	"strconv"
 
 	"github.com/antchfx/xmlquery"
-	"github.com/readium/go-toolkit/pkg/manifest"
-	"github.com/readium/go-toolkit/pkg/protection"
-	"github.com/readium/go-toolkit/pkg/util/url"
+	"github.com/nohles/go-toolkit/pkg/manifest"
+	"github.com/nohles/go-toolkit/pkg/protection"
+	"github.com/nohles/go-toolkit/pkg/util/url"
 )
 
 var (
