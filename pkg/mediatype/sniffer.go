@@ -152,7 +152,12 @@ func SniffAudio(ctx context.Context, context SnifferContext) *MediaType {
 	if context.HasFileExtension("aiff") || context.HasMediaType("audio/aiff") {
 		return &AIFF
 	}
-	// TODO flac, m4a
+	if context.HasFileExtension("flac") || context.HasMediaType("audio/flac") {
+		return &FLAC
+	}
+	if context.HasFileExtension("alac", "m4a", "m4b") || context.HasMediaType("audio/mp4", "audio/x-m4a", "audio/x-m4b") {
+		return &MP4Audio
+	}
 	if context.HasFileExtension("mp3") || context.HasMediaType("audio/mpeg") {
 		return &MP3
 	}

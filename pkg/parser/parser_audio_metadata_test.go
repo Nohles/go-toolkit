@@ -1,9 +1,12 @@
 package parser
 
 import (
+	"context"
 	"testing"
 	"time"
 
+	"github.com/nohles/go-toolkit/pkg/asset"
+	"github.com/nohles/go-toolkit/pkg/fetcher"
 	"github.com/nohles/go-toolkit/pkg/manifest"
 	"github.com/nohles/go-toolkit/pkg/mediatype"
 	"github.com/nohles/go-toolkit/pkg/pub"
@@ -11,6 +14,67 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type staticLinksFetcher struct {
+	fetcher.EmptyFetcher
+	links manifest.LinkList
+}
+
+func (f staticLinksFetcher) Links(ctx context.Context) (manifest.LinkList, error) {
+	return f.links, nil
+}
+
+type staticAsset struct {
+	mediaType mediatype.MediaType
+}
+
+func (a staticAsset) Name() string {
+	return "test"
+}
+
+func (a staticAsset) MediaType(ctx context.Context) mediatype.MediaType {
+	return a.mediaType
+}
+
+func (a staticAsset) CreateFetcher(ctx context.Context, dependencies asset.Dependencies, credentials string) (fetcher.Fetcher, error) {
+	return fetcher.EmptyFetcher{}, nil
+}
+
+func TestAudioAndImageParsersAcceptNilMediaTypes(t *testing.T) {
+	a := staticAsset{mediaType: mediatype.Binary}
+	f := staticLinksFetcher{
+		links: manifest.LinkList{{
+			Href: manifest.MustNewHREFFromString("track.m4b", false),
+		}},
+	}
+
+	imageAccepted, err := ImageParser{}.accepts(t.Context(), a, f)
+	require.NoError(t, err)
+	assert.False(t, imageAccepted)
+	assert.True(t, AudioParser{}.accepts(t.Context(), a, f))
+}
+
+func TestAudioParserInfersMediaTypeAndNaturalSortsTracks(t *testing.T) {
+	a := staticAsset{mediaType: mediatype.Binary}
+	f := staticLinksFetcher{
+		links: manifest.LinkList{
+			{Href: manifest.MustNewHREFFromString("book (10).m4b", false)},
+			{Href: manifest.MustNewHREFFromString("notes.rtf", false)},
+			{Href: manifest.MustNewHREFFromString("book (2).m4b", false)},
+		},
+	}
+
+	builder, err := AudioParser{}.Parse(t.Context(), a, f)
+	require.NoError(t, err)
+	require.NotNil(t, builder)
+
+	pub := builder.Build()
+	require.Len(t, pub.Manifest.ReadingOrder, 2)
+	assert.Equal(t, "book%20%282%29.m4b", pub.Manifest.ReadingOrder[0].Href.String())
+	assert.Equal(t, "book%20%2810%29.m4b", pub.Manifest.ReadingOrder[1].Href.String())
+	assert.Equal(t, &mediatype.MP4Audio, pub.Manifest.ReadingOrder[0].MediaType)
+	assert.Equal(t, &mediatype.MP4Audio, pub.Manifest.ReadingOrder[1].MediaType)
+}
 
 func TestAudioMetadataEnrichesManifestFirstCompleteWins(t *testing.T) {
 	published := time.Date(2024, time.May, 1, 0, 0, 0, 0, time.UTC)

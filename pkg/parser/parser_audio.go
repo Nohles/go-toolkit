@@ -42,6 +42,9 @@ func (p AudioParser) Parse(ctx context.Context, asset asset.PublicationAsset, fe
 		if extensions.IsHiddenOrThumbs(path) || !contains {
 			continue
 		}
+		if link.MediaType == nil {
+			link.MediaType = audioMediaTypeForPath(path)
+		}
 		readingOrder = append(readingOrder, link)
 	}
 
@@ -49,9 +52,9 @@ func (p AudioParser) Parse(ctx context.Context, asset asset.PublicationAsset, fe
 		return nil, errors.New("no audio file found in the publication")
 	}
 
-	// Sort in alphabetical order
+	// Sort in natural order so numbered tracks stay in playback sequence.
 	sort.Slice(readingOrder, func(i, j int) bool {
-		return readingOrder[i].Href.String() < readingOrder[j].Href.String()
+		return naturalLess(readingOrder[i].Href.String(), readingOrder[j].Href.String())
 	})
 
 	// Try to figure out the publication's title
@@ -91,8 +94,10 @@ func (p AudioParser) Parse(ctx context.Context, asset asset.PublicationAsset, fe
 }
 
 var allowed_extensions_audio_extra = map[string]struct{}{
-	"asx": {}, "bio": {}, "m3u": {}, "m3u8": {}, "pla": {}, "pls": {},
-	"smil": {}, "txt": {}, "vlc": {}, "wpl": {}, "xspf": {}, "zpl": {},
+	"asx": {}, "bio": {}, "cue": {}, "epub": {}, "json": {}, "m3u": {},
+	"m3u8": {}, "mobi": {}, "nfo": {}, "pdf": {}, "pla": {}, "pls": {},
+	"rtf": {}, "smil": {}, "txt": {}, "vlc": {}, "wpl": {}, "xspf": {},
+	"zpl": {},
 }
 var allowed_extensions_audio = map[string]struct{}{
 	"aac": {}, "aiff": {}, "alac": {}, "flac": {}, "m4a": {}, "m4b": {}, "mp3": {},
@@ -108,13 +113,14 @@ func (p AudioParser) accepts(ctx context.Context, asset asset.PublicationAsset, 
 		// TODO log
 		return false
 	}
+	hasAudio := false
 	for _, link := range links {
 		path := link.URL(nil, nil).Path()
 
 		if extensions.IsHiddenOrThumbs(path) {
 			continue
 		}
-		if link.MediaType.IsBitmap() {
+		if link.MediaType != nil && link.MediaType.IsBitmap() {
 			continue
 		}
 		fext := filepath.Ext(strings.ToLower(path))
@@ -123,9 +129,58 @@ func (p AudioParser) accepts(ctx context.Context, asset asset.PublicationAsset, 
 		}
 		_, contains1 := allowed_extensions_audio[fext]
 		_, contains2 := allowed_extensions_audio_extra[fext]
-		if !contains1 && !contains2 {
+		if contains1 {
+			hasAudio = true
+		} else if !contains2 {
 			return false
 		}
 	}
-	return true
+	return hasAudio
+}
+
+func audioMediaTypeForPath(path string) *mediatype.MediaType {
+	fext := filepath.Ext(strings.ToLower(path))
+	if len(fext) <= 1 {
+		return nil
+	}
+	return mediatype.OfExtension(fext[1:])
+}
+
+func naturalLess(left string, right string) bool {
+	li, ri := 0, 0
+	for li < len(left) && ri < len(right) {
+		lc, rc := left[li], right[ri]
+		if isASCIIDigit(lc) && isASCIIDigit(rc) {
+			ln, lnEnd := readNumber(left, li)
+			rn, rnEnd := readNumber(right, ri)
+			if ln != rn {
+				return ln < rn
+			}
+			if lnEnd-li != rnEnd-ri {
+				return lnEnd-li < rnEnd-ri
+			}
+			li, ri = lnEnd, rnEnd
+			continue
+		}
+		if lc != rc {
+			return lc < rc
+		}
+		li++
+		ri++
+	}
+	return len(left) < len(right)
+}
+
+func readNumber(value string, start int) (uint64, int) {
+	var number uint64
+	i := start
+	for i < len(value) && isASCIIDigit(value[i]) {
+		number = number*10 + uint64(value[i]-'0')
+		i++
+	}
+	return number, i
+}
+
+func isASCIIDigit(value byte) bool {
+	return value >= '0' && value <= '9'
 }
