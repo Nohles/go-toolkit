@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-const ManifestListPath = "/webpub/list.json"
+const ManifestListPath = "/list.json"
 
 type ManifestSourceType string
 
