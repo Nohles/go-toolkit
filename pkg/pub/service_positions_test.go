@@ -1,13 +1,16 @@
 package pub
 
 import (
+	"encoding/json"
 	"testing"
 
+	"github.com/nohles/go-toolkit/pkg/fetcher"
 	"github.com/nohles/go-toolkit/pkg/internal/extensions"
 	"github.com/nohles/go-toolkit/pkg/manifest"
 	"github.com/nohles/go-toolkit/pkg/mediatype"
 	"github.com/nohles/go-toolkit/pkg/util/url"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPerResourcePositionsServiceEmptyReadingOrder(t *testing.T) {
@@ -84,4 +87,30 @@ func TestPerResourcePositionsServiceMediaTypeFallback(t *testing.T) {
 			TotalProgression: extensions.Pointer(float64(0.0)),
 		},
 	}}, service.Positions(t.Context()))
+}
+
+func TestPositionsServiceDocumentIncludesCurrentChapter(t *testing.T) {
+	service := PerResourcePositionsService{
+		readingOrder: manifest.LinkList{
+			{Href: manifest.MustNewHREFFromString("Chapter 1.cbz", false), MediaType: &mediatype.CBZ, Title: "Chapter 1"},
+			{Href: manifest.MustNewHREFFromString("Chapter 2.cbz", false), MediaType: &mediatype.CBZ, Title: "Chapter 2"},
+		},
+	}
+	resource, ok := GetForPositionsService(t.Context(), service, PositionsLink)
+	require.True(t, ok)
+
+	data, err := fetcher.ReadResourceAsJSON(t.Context(), resource)
+	require.Nil(t, err)
+	require.NotNil(t, data)
+
+	raw, jerr := json.Marshal(data["currentChapter"])
+	require.NoError(t, jerr)
+	var locator manifest.Locator
+	jerr = json.Unmarshal(raw, &locator)
+	require.NoError(t, jerr)
+
+	require.NotNil(t, locator.Locations.Position)
+	assert.Equal(t, uint(1), *locator.Locations.Position)
+	assert.Equal(t, "Chapter%201.cbz", locator.Href.String())
+	assert.Equal(t, "Chapter 1", locator.Title)
 }

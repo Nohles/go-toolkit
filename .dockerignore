@@ -1,0 +1,13 @@
+.git
+.github
+.DS_Store
+.gitmodules
+Audiobooks
+test
+**/testdata
+*.log
+coverage
+dist
+build
+tmp
+node_modules

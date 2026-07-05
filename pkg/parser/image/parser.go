@@ -1,10 +1,12 @@
-package parser
+package image
 
 import (
 	"context"
 	"errors"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/nohles/go-toolkit/pkg/asset"
@@ -12,12 +14,17 @@ import (
 	"github.com/nohles/go-toolkit/pkg/internal/extensions"
 	"github.com/nohles/go-toolkit/pkg/manifest"
 	"github.com/nohles/go-toolkit/pkg/mediatype"
+	"github.com/nohles/go-toolkit/pkg/parser"
 	"github.com/nohles/go-toolkit/pkg/pub"
 )
 
 // Parses an image–based Publication from an unstructured archive format containing bitmap files, such as CBZ or a simple ZIP.
 // It can also work for a standalone bitmap file.
 type ImageParser struct{}
+
+func NewParser() ImageParser {
+	return ImageParser{}
+}
 
 // Parse implements PublicationParser
 func (p ImageParser) Parse(ctx context.Context, asset asset.PublicationAsset, fetcher fetcher.Fetcher) (*pub.Builder, error) {
@@ -63,7 +70,7 @@ func (p ImageParser) parseImagePublication(ctx context.Context, asset asset.Publ
 	})
 
 	// Try to figure out the publication's title
-	title := guessPublicationTitleFromFileStructure(ctx, fetcher)
+	title := parser.GuessPublicationTitleFromFileStructure(ctx, fetcher)
 	if title == "" {
 		title = asset.Name()
 	}
@@ -125,7 +132,7 @@ func acceptsImageLinks(links manifest.LinkList) bool {
 }
 
 func (p ImageParser) parseComicArchivePublication(ctx context.Context, asset asset.PublicationAsset, fetcher fetcher.Fetcher, readingOrder manifest.LinkList) *pub.Builder {
-	title := guessPublicationTitleFromFileStructure(ctx, fetcher)
+	title := parser.GuessPublicationTitleFromFileStructure(ctx, fetcher)
 	if title == "" {
 		title = asset.Name()
 	}
@@ -216,4 +223,29 @@ func titleFromComicArchiveHref(link manifest.Link) string {
 		title = strings.TrimSuffix(title, ext)
 	}
 	return strings.TrimSpace(title)
+}
+
+var naturalNumberPattern = regexp.MustCompile(`\d+`)
+
+func naturalLess(left string, right string) bool {
+	leftNumbers := naturalNumberPattern.FindAllStringIndex(left, -1)
+	rightNumbers := naturalNumberPattern.FindAllStringIndex(right, -1)
+
+	for i := 0; i < len(leftNumbers) && i < len(rightNumbers); i++ {
+		leftRange := leftNumbers[i]
+		rightRange := rightNumbers[i]
+		leftPrefix := left[:leftRange[0]]
+		rightPrefix := right[:rightRange[0]]
+		if leftPrefix != rightPrefix {
+			return left < right
+		}
+		leftValue, leftErr := strconv.Atoi(left[leftRange[0]:leftRange[1]])
+		rightValue, rightErr := strconv.Atoi(right[rightRange[0]:rightRange[1]])
+		if leftErr != nil || rightErr != nil || leftValue == rightValue {
+			continue
+		}
+		return leftValue < rightValue
+	}
+
+	return left < right
 }

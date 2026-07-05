@@ -2,6 +2,8 @@ package fetcher
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/nohles/go-toolkit/pkg/manifest"
@@ -65,6 +67,16 @@ func TestFileFetcherSubdirectoryFile(t *testing.T) {
 	require.Nil(t, err)
 	assert.EqualValues(t, 5, n)
 	assert.Equal(t, "text2", b.String())
+}
+
+func TestFileFetcherRootMountAcceptsRelativeHref(t *testing.T) {
+	f := NewFileFetcher("/", "./testdata/directory")
+
+	resource := f.Get(t.Context(), manifest.Link{Href: manifest.MustNewHREFFromString("subdirectory/text2.txt", false)})
+	bin, err := resource.Read(t.Context(), 0, 0)
+
+	require.Nil(t, err)
+	assert.Equal(t, "text2", string(bin))
 }
 
 func TestFileFetcherDirectoryNotFound(t *testing.T) {
@@ -164,7 +176,7 @@ func TestFileFetcherLinks(t *testing.T) {
 
 	mustContain := manifest.LinkList{{
 		Href:      manifest.MustNewHREFFromString("dir_href/subdirectory/hello.mp3", false),
-		MediaType: &mediatype.MP3,
+		MediaType: &mediatype.MPEGAudio,
 	}, {
 		Href:      manifest.MustNewHREFFromString("dir_href/subdirectory/text2.txt", false),
 		MediaType: &mediatype.Text,
@@ -177,4 +189,20 @@ func TestFileFetcherLinks(t *testing.T) {
 	}}
 
 	assert.ElementsMatch(t, mustContain, links)
+}
+
+func TestFileFetcherLinksSkipsHiddenFiles(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".DS_Store"), []byte("metadata"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "text.txt"), []byte("hello"), 0o644))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, ".hidden"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".hidden", "secret.txt"), []byte("secret"), 0o644))
+
+	links, err := NewFileFetcher("dir_href", dir).Links(t.Context())
+	require.NoError(t, err)
+
+	assert.Equal(t, manifest.LinkList{{
+		Href:      manifest.MustNewHREFFromString("dir_href/text.txt", false),
+		MediaType: &mediatype.Text,
+	}}, links)
 }

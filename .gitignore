@@ -1,3 +1,4 @@
+.DS_Store
 publications/*
 *.old
-.DS_Store
+test/

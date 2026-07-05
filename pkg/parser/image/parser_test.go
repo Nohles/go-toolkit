@@ -1,10 +1,12 @@
-package parser
+package image
 
 import (
+	"context"
 	"testing"
 
 	"github.com/nohles/go-toolkit/pkg/archive"
 	"github.com/nohles/go-toolkit/pkg/asset"
+	"github.com/nohles/go-toolkit/pkg/fetcher"
 	"github.com/nohles/go-toolkit/pkg/manifest"
 	"github.com/nohles/go-toolkit/pkg/mediatype"
 	"github.com/nohles/go-toolkit/pkg/pub"
@@ -12,6 +14,31 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type staticLinksFetcher struct {
+	fetcher.EmptyFetcher
+	links manifest.LinkList
+}
+
+func (f staticLinksFetcher) Links(ctx context.Context) (manifest.LinkList, error) {
+	return f.links, nil
+}
+
+type staticAsset struct {
+	mediaType mediatype.MediaType
+}
+
+func (a staticAsset) Name() string {
+	return "test"
+}
+
+func (a staticAsset) MediaType(ctx context.Context) mediatype.MediaType {
+	return a.mediaType
+}
+
+func (a staticAsset) CreateFetcher(ctx context.Context, dependencies asset.Dependencies, credentials string) (fetcher.Fetcher, error) {
+	return fetcher.EmptyFetcher{}, nil
+}
 
 func withImageParser(t *testing.T, filepath string, f func(*pub.Builder)) {
 	u, _ := url.FromFilepath(filepath)

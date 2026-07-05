@@ -38,10 +38,14 @@ func GetForPositionsService(ctx context.Context, service PositionsService, link 
 
 	return fetcher.NewBytesResource(PositionsLink, func() []byte {
 		positions := service.Positions(ctx)
-		bin, _ := json.Marshal(map[string]interface{}{
+		payload := map[string]interface{}{
 			"total":     len(positions),
 			"positions": positions,
-		})
+		}
+		if len(positions) > 0 {
+			payload["currentChapter"] = positions[0]
+		}
+		bin, _ := json.Marshal(payload)
 		return bin
 	}), true
 }

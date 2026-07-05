@@ -39,11 +39,19 @@ func (f *FileFetcher) Links(ctx context.Context) (manifest.LinkList, error) {
 				d = fs.FileInfoToDirEntry(fi)
 			}
 
+			if strings.HasPrefix(d.Name(), ".") {
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+
 			if d.IsDir() || err != nil {
 				return err
 			}
 
-			href, err := manifest.NewHREFFromString(filepath.ToSlash(filepath.Join(href, strings.TrimPrefix(apath, xpath))), false)
+			rel := strings.TrimPrefix(strings.TrimPrefix(apath, xpath), string(filepath.Separator))
+			href, err := manifest.NewHREFFromString(filepath.ToSlash(filepath.Join(href, rel)), false)
 			if err != nil {
 				return err
 			}
@@ -87,8 +95,11 @@ func (f *FileFetcher) Get(ctx context.Context, link manifest.Link) Resource {
 		linkHref = link.Href.String()
 	}
 	for itemHref, itemFile := range f.paths {
-		if strings.HasPrefix(linkHref, itemHref) {
-			resourceFile := filepath.Join(itemFile, strings.TrimPrefix(linkHref, itemHref))
+		for _, candidateHref := range fileFetcherHrefCandidates(linkHref, itemHref) {
+			if !strings.HasPrefix(candidateHref, itemHref) {
+				continue
+			}
+			resourceFile := filepath.Join(itemFile, strings.TrimPrefix(candidateHref, itemHref))
 			// Make sure that the requested resource is [path] or one of its descendant.
 			rapath, err := filepath.Abs(filepath.ToSlash(resourceFile))
 			if err != nil {
@@ -106,6 +117,16 @@ func (f *FileFetcher) Get(ctx context.Context, link manifest.Link) Resource {
 		}
 	}
 	return NewFailureResource(link, NotFound(errors.New("couldn't find "+linkHref+" in FileFetcher paths")))
+}
+
+func fileFetcherHrefCandidates(linkHref string, itemHref string) []string {
+	if strings.HasPrefix(itemHref, "/") && !strings.HasPrefix(linkHref, "/") {
+		return []string{linkHref, "/" + linkHref}
+	}
+	if !strings.HasPrefix(itemHref, "/") && strings.HasPrefix(linkHref, "/") {
+		return []string{linkHref, strings.TrimPrefix(linkHref, "/")}
+	}
+	return []string{linkHref}
 }
 
 // Close implements Fetcher

@@ -4,14 +4,17 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/pkg/errors"
 	"github.com/nohles/go-toolkit/pkg/archive"
 	"github.com/nohles/go-toolkit/pkg/asset"
 	"github.com/nohles/go-toolkit/pkg/manifest"
 	"github.com/nohles/go-toolkit/pkg/parser"
+	"github.com/nohles/go-toolkit/pkg/parser/audio"
 	"github.com/nohles/go-toolkit/pkg/parser/epub"
+	"github.com/nohles/go-toolkit/pkg/parser/image"
 	"github.com/nohles/go-toolkit/pkg/parser/pdf"
+	"github.com/nohles/go-toolkit/pkg/parser/webpub"
 	"github.com/nohles/go-toolkit/pkg/pub"
+	"github.com/pkg/errors"
 )
 
 // Streamer opens a `Publication` using a list of parsers.
@@ -71,9 +74,9 @@ func New(config Config) Streamer { // TODO contentProtections
 	defaultParsers := []parser.PublicationParser{
 		epub.NewParser(nil), // TODO pass strategy
 		pdf.NewParser(),
-		parser.NewWebPubParser(config.HttpClient),
-		parser.ImageParser{},
-		parser.AudioParser{},
+		webpub.NewParser(config.HttpClient),
+		image.NewParser(),
+		audio.NewRichParser(),
 	}
 
 	if !config.IgnoreDefaultParsers {
