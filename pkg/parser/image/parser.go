@@ -186,7 +186,15 @@ func comicArchiveReadingOrder(links manifest.LinkList) (manifest.LinkList, bool)
 		return nil, false
 	}
 
-	sort.Slice(readingOrder, func(i, j int) bool {
+	sort.SliceStable(readingOrder, func(i, j int) bool {
+		leftOrder, leftHasOrder := chapterOrderNumber(titleFromComicArchiveHref(readingOrder[i]))
+		rightOrder, rightHasOrder := chapterOrderNumber(titleFromComicArchiveHref(readingOrder[j]))
+		if leftHasOrder && rightHasOrder && leftOrder != rightOrder {
+			return leftOrder < rightOrder
+		}
+		if leftHasOrder != rightHasOrder {
+			return leftHasOrder
+		}
 		return naturalLess(readingOrder[i].Href.String(), readingOrder[j].Href.String())
 	})
 	return readingOrder, true
@@ -226,6 +234,45 @@ func titleFromComicArchiveHref(link manifest.Link) string {
 }
 
 var naturalNumberPattern = regexp.MustCompile(`\d+`)
+
+var chapterOrderPatterns = []struct {
+	pattern *regexp.Regexp
+	group   int
+}{
+	{regexp.MustCompile(`(?i)(^|[\s_.-])(chapter|ch)\s*\.?\s*([0-9]+(\.[0-9]+)?)\b`), 3},
+	{regexp.MustCompile(`(?i)(^|[\s_.-])c([0-9]+(\.[0-9]+)?)\b`), 2},
+	{regexp.MustCompile(`(?i)(^|[\s_.-])(episode|episodes|ep)\s*\.?\s*([0-9]+(\.[0-9]+)?)\b`), 3},
+	{regexp.MustCompile(`(^|[\s_.-])#\s*\.?\s*([0-9]+(\.[0-9]+)?)\b`), 2},
+	{regexp.MustCompile(`(?i)(vol|volume|v)\s*\.?\s*([0-9]+(\.[0-9]+)?)`), 2},
+	{regexp.MustCompile(`第([0-9]+(\.[0-9]+)?)話`), 1},
+	{regexp.MustCompile(`第([0-9]+)巻`), 1},
+}
+
+var specialOrderPattern = regexp.MustCompile(`(?i)\bSP\s*[0-9]+(\.[0-9]+)?\b`)
+
+func chapterOrderNumber(filename string) (float64, bool) {
+	filename = strings.NewReplacer("(", " ", ")", " ", "[", " ", "]", " ", "{", " ", "}", " ").Replace(filename)
+	filename = strings.Join(strings.Fields(filename), " ")
+	if specialOrderPattern.MatchString(filename) {
+		return 0, false
+	}
+
+	for _, candidate := range chapterOrderPatterns {
+		match := candidate.pattern.FindStringSubmatch(filename)
+		if len(match) <= candidate.group {
+			continue
+		}
+		number, err := strconv.ParseFloat(match[candidate.group], 64)
+		if err == nil && number >= 0 && number <= 9999 {
+			return number, true
+		}
+	}
+
+	if number, err := strconv.ParseFloat(filename, 64); err == nil && number >= 0 && number <= 9999 {
+		return number, true
+	}
+	return 0, false
+}
 
 func naturalLess(left string, right string) bool {
 	leftNumbers := naturalNumberPattern.FindAllStringIndex(left, -1)
