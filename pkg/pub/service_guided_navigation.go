@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/pkg/errors"
 	"github.com/nohles/go-toolkit/pkg/fetcher"
+	"github.com/nohles/go-toolkit/pkg/guidednavigation"
 	"github.com/nohles/go-toolkit/pkg/manifest"
 	"github.com/nohles/go-toolkit/pkg/mediatype"
 	"github.com/nohles/go-toolkit/pkg/util/url"
+	"github.com/pkg/errors"
 )
 
 var GuidedNavigationLink = manifest.Link{
@@ -27,7 +28,7 @@ func init() {
 // Provides a way to access guided navigation documents for resources of a [Publication].
 type GuidedNavigationService interface {
 	Service
-	GuideForResource(ctx context.Context, href string) (*manifest.GuidedNavigationDocument, error)
+	GuideForResource(ctx context.Context, href string) (*guidednavigation.GuidedNavigationDocument, error)
 	HasGuideForResource(href string) bool
 }
 

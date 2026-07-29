@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/nohles/go-toolkit/pkg/manifest"
 	"github.com/nohles/go-toolkit/pkg/mediatype"
@@ -19,6 +20,12 @@ type HTTPFetcher struct {
 	href   string
 	client *http.Client
 	url    url.AbsoluteURL
+
+	// sizes shares resource sizes (resolved URL -> int64) across the resources
+	// created by Get, so serving many requests for the same resource — every
+	// one of which needs the length — performs a single HEAD request over the
+	// fetcher's lifetime instead of one per request.
+	sizes sync.Map
 }
 
 func NewHTTPFetcher(href string, client *http.Client, url url.AbsoluteURL) *HTTPFetcher {
@@ -66,10 +73,17 @@ func (f *HTTPFetcher) Get(ctx context.Context, link manifest.Link) Resource {
 	if strings.HasPrefix(linkHref, f.href) {
 		rurl, err := url.RelativeURLFromString(strings.TrimPrefix(linkHref, f.href))
 		if err == nil {
-			return &httpResource{
-				link:   link,
-				client: f.client,
-				url:    f.url.Resolve(rurl).(url.AbsoluteURL),
+			resolved := f.url.Resolve(rurl).(url.AbsoluteURL)
+			// Keep the resource within the base URL: a `..` or root-absolute HREF must
+			// not let an incoming request reach a path outside the fetcher's location.
+			// Relativize returns a relative URL only when [resolved] is under [f.url].
+			if _, ok := f.url.Relativize(resolved).(url.RelativeURL); ok {
+				return &httpResource{
+					link:   link,
+					client: f.client,
+					url:    resolved,
+					sizes:  &f.sizes,
+				}
 			}
 		}
 	}
@@ -81,6 +95,18 @@ func (f *HTTPFetcher) Close() {
 	// No-op for HTTP
 }
 
+// Creates a [Resource] serving the contents of the given HTTP(S) URL.
+func NewHTTPResource(link manifest.Link, client *http.Client, url url.AbsoluteURL) Resource {
+	if client == nil {
+		panic("NewHTTPResource requires a non-nil client")
+	}
+	return &httpResource{
+		link:   link,
+		client: client,
+		url:    url,
+	}
+}
+
 // Resource from HTTP
 type httpResource struct {
 	link   manifest.Link
@@ -88,6 +114,7 @@ type httpResource struct {
 	url    url.AbsoluteURL
 
 	cachedSize *int64
+	sizes      *sync.Map // Optional fetcher-shared size cache, see HTTPFetcher
 }
 
 // Link implements Resource
@@ -111,6 +138,12 @@ func (r *httpResource) File() string {
 }
 
 func (r *httpResource) size(ctx context.Context) (int64, *ResourceError) {
+	if r.cachedSize == nil && r.sizes != nil {
+		if v, ok := r.sizes.Load(r.url.String()); ok {
+			length := v.(int64)
+			r.cachedSize = &length
+		}
+	}
 	if r.cachedSize == nil {
 		req, err := http.NewRequestWithContext(ctx, http.MethodHead, r.url.String(), nil)
 		if err != nil {
@@ -141,7 +174,9 @@ func (r *httpResource) size(ctx context.Context) (int64, *ResourceError) {
 			return 0, Other(errors.Wrap(err, "failed to parse Content-Length header"))
 		}
 		r.cachedSize = &length
-
+		if r.sizes != nil {
+			r.sizes.Store(r.url.String(), length)
+		}
 	}
 	return *r.cachedSize, nil
 }
@@ -171,6 +206,7 @@ func (r *httpResource) Read(ctx context.Context, start int64, end int64) ([]byte
 	if err != nil {
 		return nil, Other(err)
 	}
+	defer resp.Body.Close()
 
 	if (start == 0 && end == 0 && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent) || ((start != 0 || end != 0) && resp.StatusCode != http.StatusPartialContent) {
 		ex := httpStatusToException(resp.StatusCode)
@@ -179,7 +215,6 @@ func (r *httpResource) Read(ctx context.Context, start int64, end int64) ([]byte
 		}
 		return nil, ex
 	}
-	defer resp.Body.Close()
 
 	var data []byte
 	if resp.ContentLength >= 0 {
@@ -219,20 +254,29 @@ func (r *httpResource) Stream(ctx context.Context, w io.Writer, start int64, end
 	if err != nil {
 		return -1, Other(err)
 	}
-	if resp.StatusCode != http.StatusPartialContent {
+	defer resp.Body.Close()
+
+	// A request without a Range header (whole resource) is answered with 200,
+	// a ranged request must be answered with 206.
+	if (start == 0 && end == 0 && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent) || ((start != 0 || end != 0) && resp.StatusCode != http.StatusPartialContent) {
 		ex := httpStatusToException(resp.StatusCode)
 		if ex == nil {
 			return -1, Other(errors.New("unexpected HTTP status code: " + strconv.Itoa(resp.StatusCode)))
 		}
 		return -1, ex
 	}
-	defer resp.Body.Close()
 
 	n, err := io.Copy(w, resp.Body)
 	if err != nil {
 		return -1, Other(err)
 	}
 	return n, nil
+}
+
+// HasEfficientStream implements EfficientStreamer. Stream performs a single
+// ranged HTTP request and pipes the response body through as it arrives.
+func (r *httpResource) HasEfficientStream() bool {
+	return true
 }
 
 // Length implements Resource

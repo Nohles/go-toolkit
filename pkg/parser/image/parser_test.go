@@ -124,6 +124,42 @@ func TestImageComicArchiveFolderReadingOrderAndTOC(t *testing.T) {
 	assert.Equal(t, &mediatype.CBZ, pub.Manifest.TableOfContents[0].MediaType)
 }
 
+func TestImageComicArchiveFolderSortsByParsedChapterNumber(t *testing.T) {
+	a := staticAsset{mediaType: mediatype.Binary}
+	f := staticLinksFetcher{
+		links: manifest.LinkList{
+			{Href: manifest.MustNewHREFFromString("(S2) Episode 116 (ch. 116).cbz", false)},
+			{Href: manifest.MustNewHREFFromString("(S2) Ep. 1 - Season Premiere (ch. 86).cbz", false)},
+			{Href: manifest.MustNewHREFFromString("Episode 2 (ch. 2).cbz", false)},
+			{Href: manifest.MustNewHREFFromString("(S2) Episode 115 (ch. 115).cbz", false)},
+			{Href: manifest.MustNewHREFFromString("Episode 85 (ch. 85).cbz", false)},
+			{Href: manifest.MustNewHREFFromString("Episode 1 (ch. 1).cbz", false)},
+		},
+	}
+
+	builder, err := ImageParser{}.Parse(t.Context(), a, f)
+	require.NoError(t, err)
+	require.NotNil(t, builder)
+
+	pub := builder.Build()
+	assert.Equal(t, []string{
+		"Episode 1 (ch. 1)",
+		"Episode 2 (ch. 2)",
+		"Episode 85 (ch. 85)",
+		"(S2) Ep. 1 - Season Premiere (ch. 86)",
+		"(S2) Episode 115 (ch. 115)",
+		"(S2) Episode 116 (ch. 116)",
+	}, tocTitles(pub.Manifest.TableOfContents))
+}
+
+func tocTitles(links manifest.LinkList) []string {
+	titles := make([]string, len(links))
+	for i, link := range links {
+		titles[i] = link.Title
+	}
+	return titles
+}
+
 func TestImageComicArchiveFolderRejectsUnsupportedEntries(t *testing.T) {
 	a := staticAsset{mediaType: mediatype.Binary}
 	f := staticLinksFetcher{

@@ -4,10 +4,10 @@ import (
 	"strconv"
 
 	"github.com/antchfx/xmlquery"
-	"github.com/pkg/errors"
 	"github.com/nohles/go-toolkit/pkg/manifest"
 	"github.com/nohles/go-toolkit/pkg/mediatype"
 	"github.com/nohles/go-toolkit/pkg/util/url"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -178,7 +178,7 @@ func ParseItemRef(element *xmlquery.Node, prefixMap map[string]string) *ItemRef 
 
 	pp := parseProperties(element.SelectAttr("properties"))
 	properties := make([]string, 0, len(pp))
-	for _, prop := range parseProperties(element.SelectAttr("properties")) {
+	for _, prop := range pp {
 		if prop == "" {
 			continue
 		}

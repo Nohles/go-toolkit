@@ -7,11 +7,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/nohles/go-toolkit/pkg/archive"
 	"github.com/nohles/go-toolkit/pkg/fetcher"
 	"github.com/nohles/go-toolkit/pkg/mediatype"
 	"github.com/nohles/go-toolkit/pkg/util/url"
+	"github.com/pkg/errors"
 )
 
 // Represents a publication stored on an Amazon S3-compatible remote server.
@@ -109,6 +109,20 @@ func (a *HTTPAsset) MediaType(ctx context.Context) mediatype.MediaType {
 		}
 	}
 	return *a.mediatype
+}
+
+// Location implements RelativePublicationAsset
+func (a *HTTPAsset) Location() url.URL {
+	return a.url
+}
+
+// CreateRelativeFetcher implements RelativePublicationAsset
+func (a *HTTPAsset) CreateRelativeFetcher(ctx context.Context, root url.URL) (fetcher.Fetcher, error) {
+	u, ok := root.(url.AbsoluteURL)
+	if !ok || !u.IsHTTP() {
+		return nil, errors.New("root of an HTTP asset must be an absolute HTTP(S) URL")
+	}
+	return fetcher.NewHTTPFetcher("", a.client, u), nil
 }
 
 // CreateFetcher implements PublicationAsset

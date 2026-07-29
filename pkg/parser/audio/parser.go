@@ -35,10 +35,16 @@ type AudioParser struct {
 	// range requests; smaller blocks transfer less for scattered reads.
 	cacheBlockSize int
 
-	// concurrency caps how many audio files are probed in parallel. Zero means
-	// the default. Higher values hide more per-file latency on remote sources at
-	// the cost of more in-flight requests.
+	// concurrency caps how many audio files are probed in parallel, and how many
+	// parallel reads are used within a file (e.g. fetching scattered chapter
+	// samples). Zero means the default. Higher values hide more per-file latency
+	// on remote sources at the cost of more in-flight requests.
 	concurrency int
+
+	// retainCache keeps the blocks fetched while probing attached to the
+	// publication, so serving the audio files can answer those byte ranges from
+	// memory. See WithRetainedCache.
+	retainCache bool
 }
 
 // Option configures an AudioParser.
@@ -66,14 +72,36 @@ func WithCacheBlockSize(size int) Option {
 }
 
 // WithConcurrency sets how many audio files are probed in parallel while
-// extracting rich metadata. The default is 8. A value <= 0 is ignored and keeps
-// the default. Use 1 to probe sequentially.
+// extracting rich metadata, and also bounds the parallel reads used within a
+// single file (e.g. fetching the scattered chapter-title samples of an MP4
+// chapter track). The default is 8. A value <= 0 is ignored and keeps the
+// default. Use 1 to probe and read fully sequentially. Note that both levels
+// can be in flight at once, so the worst-case number of concurrent requests is
+// roughly the square of this value.
 func WithConcurrency(n int) Option {
 	return func(p *AudioParser) {
 		if n > 0 {
 			p.concurrency = n
 		}
 	}
+}
+
+// WithRetainedCache keeps the read-cache blocks fetched while probing attached
+// to the parsed publication, so that serving its audio files answers those
+// byte ranges — and the resources' lengths — from memory instead of new remote
+// requests. Chapter-title samples are also pulled through the block cache
+// (costing up to one block of extra transfer per chapter while parsing).
+//
+// The retained ranges — container headers and chapter samples — are exactly
+// what a browser's demuxer requests before starting playback of an M4B, so
+// this trades a slightly more expensive parse for a much faster time to first
+// audio. Recommended when the publication is opened once and served many
+// times (e.g. an HTTP streamer in front of remote storage); wasteful for
+// one-shot parsing, and unnecessary for local files. Memory cost is bounded
+// by what probing touched: typically a few blocks per file plus one per
+// chapter.
+func WithRetainedCache() Option {
+	return func(p *AudioParser) { p.retainCache = true }
 }
 
 func NewParser() AudioParser {
@@ -148,8 +176,13 @@ func (p AudioParser) Parse(ctx context.Context, asset asset.PublicationAsset, fe
 	// When rich parsing is enabled, probe the audio files for durations,
 	// bitrates, embedded metadata, a cover and a table of contents.
 	if p.rich {
-		if coverFactory := p.enrich(ctx, fetcher, &man); coverFactory != nil {
+		coverFactory, caches := p.enrich(ctx, fetcher, &man)
+		if coverFactory != nil {
 			serviceFactories[pub.CoverService_Name] = coverFactory
+		}
+		if len(caches) > 0 {
+			// Serve the byte ranges fetched while probing from memory.
+			fetcher = &cacheFetcher{Fetcher: fetcher, caches: caches}
 		}
 	}
 

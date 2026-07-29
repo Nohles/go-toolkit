@@ -23,8 +23,9 @@ const defaultProbeConcurrency = 8
 // reading-order resource for its duration and bitrate, extracts publication
 // metadata (and a cover) from the first audio file, and builds a table of
 // contents. It mutates m in place and returns a cover service factory (or nil
-// when no cover was found).
-func (p AudioParser) enrich(ctx context.Context, fetch fetcher.Fetcher, m *manifest.Manifest) pub.ServiceFactory {
+// when no cover was found), plus — when the parser retains probe caches — the
+// per-HREF caches to attach to the publication.
+func (p AudioParser) enrich(ctx context.Context, fetch fetcher.Fetcher, m *manifest.Manifest) (pub.ServiceFactory, map[string]*retainedCache) {
 	var firstTags *audioTags
 	var totalDuration float64
 	var embeddedChapters manifest.LinkList
@@ -54,16 +55,24 @@ func (p AudioParser) enrich(ctx context.Context, fetch fetcher.Fetcher, m *manif
 	for i := range readingOrder {
 		i, link, res := i, readingOrder[i], resources[i]
 		g.Go(func() error {
-			probed[i] = probeReadingOrderItem(ctx, res, link, extractChapters, blockSize)
+			probed[i] = probeReadingOrderItem(ctx, res, link, extractChapters, blockSize, concurrency, p.retainCache)
 			return nil
 		})
 	}
 	_ = g.Wait()
 
 	// Combine the results in reading order so the output is deterministic.
+	var caches map[string]*retainedCache
 	for i := range readingOrder {
 		link := readingOrder[i]
 		p := probed[i]
+
+		if p.cache != nil {
+			if caches == nil {
+				caches = make(map[string]*retainedCache, len(readingOrder))
+			}
+			caches[link.Href.String()] = p.cache
+		}
 
 		if p.probe.Duration > 0 {
 			link.Duration = p.probe.Duration
@@ -104,30 +113,37 @@ func (p AudioParser) enrich(ctx context.Context, fetch fetcher.Fetcher, m *manif
 	}
 
 	if firstTags != nil {
-		return coverServiceFactory(firstTags.Picture)
+		return coverServiceFactory(firstTags.Picture), caches
 	}
-	return nil
+	return nil, caches
 }
 
 // probedItem is the per-file result of the parallel probing pass.
 type probedItem struct {
 	tags  *audioTags
 	probe probeResult
+	cache *retainedCache // Blocks fetched while probing, when retention is enabled
 }
 
 // probeReadingOrderItem reads the tags and probes the duration/bitrate/chapters
 // of a single reading-order resource, always releasing the resource handle.
+// concurrency bounds the parallel reads used within the file (e.g. fetching
+// scattered chapter samples).
 //
 // All reads go through a per-file block cache so that the tag and duration
 // passes — which perform many small, overlapping reads of the header region —
 // coalesce into a handful of range requests rather than one request each. This
 // matters most for remote sources (HTTP, S3) and ZIP archives.
-func probeReadingOrderItem(ctx context.Context, res fetcher.Resource, link manifest.Link, extractChapters bool, blockSize int64) probedItem {
+func probeReadingOrderItem(ctx context.Context, res fetcher.Resource, link manifest.Link, extractChapters bool, blockSize int64, concurrency int, retain bool) probedItem {
 	defer res.Close()
 	size, _ := res.Length(ctx)
-	cached := newReadCache(res, size, blockSize)
+	cached := newReadCache(res, size, blockSize, retain)
 	tags := readAudioTags(cached)
-	return probedItem{tags: tags, probe: probeAudioFile(ctx, cached, link, tags, extractChapters)}
+	item := probedItem{tags: tags, probe: probeAudioFile(ctx, cached, link, tags, extractChapters, concurrency)}
+	if retain {
+		item.cache = cached.snapshot()
+	}
+	return item
 }
 
 // playlistTOC looks for the first parseable playlist file in the publication and

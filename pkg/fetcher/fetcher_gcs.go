@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"sync"
 
 	"cloud.google.com/go/storage"
 	"github.com/nohles/go-toolkit/pkg/manifest"
@@ -22,6 +23,12 @@ type GCSFetcher struct {
 	handle *storage.ObjectHandle
 
 	cachedLinks manifest.LinkList
+
+	// attrsCache shares object metadata (object name -> *storage.ObjectAttrs)
+	// across the resources created by Get, so serving many requests for the
+	// same object — every one of which needs the length — performs a single
+	// attributes call over the fetcher's lifetime instead of one per request.
+	attrsCache sync.Map
 }
 
 func NewGCSFetcher(href string, client *storage.Client, handle *storage.ObjectHandle) *GCSFetcher {
@@ -122,12 +129,24 @@ func (f *GCSFetcher) Links(ctx context.Context) (manifest.LinkList, error) {
 
 // Get implements Fetcher
 func (f *GCSFetcher) Get(ctx context.Context, link manifest.Link) Resource {
-	linkHref := link.Href.String()
+	// Use the decoded path for the object lookup: GCS object names are raw strings, so a
+	// percent-encoded HREF would never match, and queries/fragments don't belong in names.
+	var linkHref string
+	if hrefURL := link.Href.Resolve(nil, nil); hrefURL != nil {
+		linkHref = hrefURL.Path()
+	} else {
+		linkHref = link.Href.String()
+	}
 	if strings.HasPrefix(linkHref, f.href) {
 		resourceFile := path.Join(f.handle.ObjectName(), strings.TrimPrefix(linkHref, f.href))
-		return &gcsResource{
-			handle: f.client.Bucket(f.handle.BucketName()).Object(resourceFile),
-			link:   link,
+		// Keep the resource within the fetcher's object-name prefix: a `..` in the HREF
+		// must not let an incoming request reach objects elsewhere in the bucket.
+		if keyWithinRoot(f.handle.ObjectName(), resourceFile) {
+			return &gcsResource{
+				handle:     f.client.Bucket(f.handle.BucketName()).Object(resourceFile),
+				link:       link,
+				attrsCache: &f.attrsCache,
+			}
 		}
 	}
 
@@ -143,6 +162,7 @@ type gcsResource struct {
 	link        manifest.Link
 	handle      *storage.ObjectHandle
 	cachedAttrs *storage.ObjectAttrs
+	attrsCache  *sync.Map // Optional fetcher-shared metadata cache, see GCSFetcher
 }
 
 // Link implements Resource
@@ -166,12 +186,20 @@ func (r *gcsResource) File() string {
 }
 
 func (r *gcsResource) attrs(ctx context.Context) (*storage.ObjectAttrs, *ResourceError) {
+	if r.cachedAttrs == nil && r.attrsCache != nil {
+		if v, ok := r.attrsCache.Load(r.handle.ObjectName()); ok {
+			r.cachedAttrs = v.(*storage.ObjectAttrs)
+		}
+	}
 	if r.cachedAttrs == nil {
 		head, err := r.handle.Attrs(ctx)
 		if err != nil {
 			return nil, gcsErrorToException(err)
 		}
 		r.cachedAttrs = head
+		if r.attrsCache != nil {
+			r.attrsCache.Store(r.handle.ObjectName(), head)
+		}
 	}
 	return r.cachedAttrs, nil
 }
@@ -230,6 +258,12 @@ func (r *gcsResource) Stream(ctx context.Context, w io.Writer, start int64, end 
 		return -1, Other(err)
 	}
 	return n, nil
+}
+
+// HasEfficientStream implements EfficientStreamer. Stream performs a single
+// ranged object read and pipes the data through as it arrives.
+func (r *gcsResource) HasEfficientStream() bool {
+	return true
 }
 
 // Length implements Resource
