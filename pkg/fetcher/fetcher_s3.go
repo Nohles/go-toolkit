@@ -7,6 +7,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -24,6 +25,12 @@ type S3Fetcher struct {
 	key    string
 
 	cachedLinks manifest.LinkList
+
+	// heads shares object metadata (key -> *s3.HeadObjectOutput) across the
+	// resources created by Get, so serving many requests for the same object —
+	// every one of which needs the length — performs a single HeadObject call
+	// over the fetcher's lifetime instead of one per request.
+	heads sync.Map
 }
 
 func NewS3Fetcher(href string, client *s3.Client, bucket, key string) *S3Fetcher {
@@ -108,14 +115,26 @@ func (f *S3Fetcher) Links(ctx context.Context) (manifest.LinkList, error) {
 
 // Get implements Fetcher
 func (f *S3Fetcher) Get(ctx context.Context, link manifest.Link) Resource {
-	linkHref := link.Href.String()
+	// Use the decoded path for the object lookup: S3 keys are raw strings, so a
+	// percent-encoded HREF would never match, and queries/fragments don't belong in keys.
+	var linkHref string
+	if hrefURL := link.Href.Resolve(nil, nil); hrefURL != nil {
+		linkHref = hrefURL.Path()
+	} else {
+		linkHref = link.Href.String()
+	}
 	if strings.HasPrefix(linkHref, f.href) {
 		resourceFile := path.Join(f.key, strings.TrimPrefix(linkHref, f.href))
-		return &s3Resource{
-			link:   link,
-			client: f.client,
-			bucket: f.bucket,
-			key:    resourceFile,
+		// Keep the resource within the fetcher's key prefix: a `..` in the HREF must
+		// not let an incoming request reach objects elsewhere in the bucket.
+		if keyWithinRoot(f.key, resourceFile) {
+			return &s3Resource{
+				link:   link,
+				client: f.client,
+				bucket: f.bucket,
+				key:    resourceFile,
+				heads:  &f.heads,
+			}
 		}
 	}
 
@@ -134,6 +153,7 @@ type s3Resource struct {
 	key    string
 
 	cachedHead *s3.HeadObjectOutput
+	heads      *sync.Map // Optional fetcher-shared metadata cache, see S3Fetcher
 }
 
 // Link implements Resource
@@ -164,6 +184,11 @@ func (r *s3Resource) object() *s3.GetObjectInput {
 }
 
 func (r *s3Resource) head(ctx context.Context) (*s3.HeadObjectOutput, *ResourceError) {
+	if r.cachedHead == nil && r.heads != nil {
+		if v, ok := r.heads.Load(r.key); ok {
+			r.cachedHead = v.(*s3.HeadObjectOutput)
+		}
+	}
 	if r.cachedHead == nil {
 		head, err := r.client.HeadObject(ctx, &s3.HeadObjectInput{
 			Bucket: &r.bucket,
@@ -173,6 +198,9 @@ func (r *s3Resource) head(ctx context.Context) (*s3.HeadObjectOutput, *ResourceE
 			return nil, awsErrorToException(err)
 		}
 		r.cachedHead = head
+		if r.heads != nil {
+			r.heads.Store(r.key, head)
+		}
 	}
 	return r.cachedHead, nil
 }
@@ -195,7 +223,7 @@ func (r *s3Resource) Read(ctx context.Context, start int64, end int64) ([]byte, 
 		obj.Range = aws.String(sb.String())
 	}
 
-	output, err := r.client.GetObject(ctx, r.object())
+	output, err := r.client.GetObject(ctx, obj)
 	if err != nil {
 		return nil, awsErrorToException(err)
 	}
@@ -243,6 +271,12 @@ func (r *s3Resource) Stream(ctx context.Context, w io.Writer, start int64, end i
 		return -1, Other(err)
 	}
 	return n, nil
+}
+
+// HasEfficientStream implements EfficientStreamer. Stream performs a single
+// ranged GetObject request and pipes the response body through as it arrives.
+func (r *s3Resource) HasEfficientStream() bool {
+	return true
 }
 
 // Length implements Resource
