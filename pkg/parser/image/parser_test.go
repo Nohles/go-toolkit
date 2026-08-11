@@ -152,6 +152,81 @@ func TestImageComicArchiveFolderSortsByParsedChapterNumber(t *testing.T) {
 	}, tocTitles(pub.Manifest.TableOfContents))
 }
 
+func TestImageComicArchiveFolderUsesExplicitReadingOrderSelection(t *testing.T) {
+	a := staticAsset{mediaType: mediatype.Binary}
+	f := staticLinksFetcher{
+		links: manifest.LinkList{
+			{Href: manifest.MustNewHREFFromString("A Chapter 1.cbz", false)},
+			{Href: manifest.MustNewHREFFromString("B Chapter 1.cbz", false)},
+			{Href: manifest.MustNewHREFFromString("A Chapter 2.cbz", false)},
+			{Href: manifest.MustNewHREFFromString("B Chapter 2.cbz", false)},
+		},
+	}
+	parser := NewParser(WithComicArchiveReadingOrder(
+		manifest.MustNewHREFFromString("A%20Chapter%202.cbz", false),
+		manifest.MustNewHREFFromString("A%20Chapter%201.cbz", false),
+	))
+
+	builder, err := parser.Parse(t.Context(), a, f)
+	require.NoError(t, err)
+	require.NotNil(t, builder)
+
+	publication := builder.Build()
+	assert.Equal(t, []string{"A Chapter 2", "A Chapter 1"}, tocTitles(publication.Manifest.TableOfContents))
+	require.Len(t, publication.Manifest.ReadingOrder, 2)
+	assert.Equal(t, "A%20Chapter%202.cbz", publication.Manifest.ReadingOrder[0].Href.String())
+}
+
+func TestImageComicArchiveFolderRejectsInvalidReadingOrderSelections(t *testing.T) {
+	a := staticAsset{mediaType: mediatype.Binary}
+	f := staticLinksFetcher{links: manifest.LinkList{
+		{Href: manifest.MustNewHREFFromString("Chapter%201.cbz", false)},
+	}}
+
+	tests := []struct {
+		name  string
+		hrefs []manifest.HREF
+		match string
+	}{
+		{name: "empty", hrefs: []manifest.HREF{}, match: "must not be empty"},
+		{name: "duplicate", hrefs: []manifest.HREF{
+			manifest.MustNewHREFFromString("Chapter%201.cbz", false),
+			manifest.MustNewHREFFromString("Chapter%201.cbz", false),
+		}, match: "duplicate"},
+		{name: "unknown", hrefs: []manifest.HREF{
+			manifest.MustNewHREFFromString("Chapter%202.cbz", false),
+		}, match: "unknown"},
+		{name: "traversal", hrefs: []manifest.HREF{
+			manifest.MustNewHREFFromString("../Chapter%201.cbz", false),
+		}, match: "traversal"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			parser := NewParser(WithComicArchiveReadingOrder(test.hrefs...))
+			builder, err := parser.Parse(t.Context(), a, f)
+			assert.Nil(t, builder)
+			require.ErrorContains(t, err, test.match)
+		})
+	}
+}
+
+func TestImageComicArchiveSelectionDoesNotApplyToIndividualArchive(t *testing.T) {
+	withImageParser(t, "./testdata/image/futuristic_tales.cbz", func(builder *pub.Builder) {
+		require.NotNil(t, builder)
+	})
+
+	u, err := url.FromFilepath("./testdata/image/futuristic_tales.cbz")
+	require.NoError(t, err)
+	a := asset.File(u)
+	fet, err := a.CreateFetcher(t.Context(), asset.Dependencies{ArchiveFactory: archive.NewArchiveFactory()}, "")
+	require.NoError(t, err)
+	parser := NewParser(WithComicArchiveReadingOrder())
+	builder, err := parser.Parse(t.Context(), a, fet)
+	require.NoError(t, err)
+	require.NotNil(t, builder)
+}
+
 func tocTitles(links manifest.LinkList) []string {
 	titles := make([]string, len(links))
 	for i, link := range links {
