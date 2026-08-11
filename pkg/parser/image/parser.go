@@ -3,6 +3,8 @@ package image
 import (
 	"context"
 	"errors"
+	"fmt"
+	pathpkg "path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -16,14 +18,32 @@ import (
 	"github.com/nohles/go-toolkit/pkg/mediatype"
 	"github.com/nohles/go-toolkit/pkg/parser"
 	"github.com/nohles/go-toolkit/pkg/pub"
+	"github.com/nohles/go-toolkit/pkg/util/url"
 )
 
 // Parses an image–based Publication from an unstructured archive format containing bitmap files, such as CBZ or a simple ZIP.
 // It can also work for a standalone bitmap file.
-type ImageParser struct{}
+type ImageParser struct {
+	comicArchiveReadingOrder []manifest.HREF
+}
 
-func NewParser() ImageParser {
-	return ImageParser{}
+type Option func(*ImageParser)
+
+// WithComicArchiveReadingOrder restricts a directory-of-archives publication
+// to the given ordered HREFs. The HREFs must already exist in the directory.
+func WithComicArchiveReadingOrder(hrefs ...manifest.HREF) Option {
+	return func(parser *ImageParser) {
+		parser.comicArchiveReadingOrder = make([]manifest.HREF, len(hrefs))
+		copy(parser.comicArchiveReadingOrder, hrefs)
+	}
+}
+
+func NewParser(options ...Option) ImageParser {
+	parser := ImageParser{}
+	for _, option := range options {
+		option(&parser)
+	}
+	return parser
 }
 
 // Parse implements PublicationParser
@@ -38,6 +58,12 @@ func (p ImageParser) Parse(ctx context.Context, asset asset.PublicationAsset, fe
 	}
 
 	if readingOrder, ok := comicArchiveReadingOrder(links); ok {
+		if p.comicArchiveReadingOrder != nil {
+			readingOrder, err = selectComicArchiveReadingOrder(readingOrder, p.comicArchiveReadingOrder)
+			if err != nil {
+				return nil, err
+			}
+		}
 		return p.parseComicArchivePublication(ctx, asset, fetcher, readingOrder), nil
 	}
 
@@ -198,6 +224,64 @@ func comicArchiveReadingOrder(links manifest.LinkList) (manifest.LinkList, bool)
 		return naturalLess(readingOrder[i].Href.String(), readingOrder[j].Href.String())
 	})
 	return readingOrder, true
+}
+
+func canonicalComicArchiveHREF(href manifest.HREF) (string, error) {
+	if href.IsTemplated() {
+		return "", errors.New("comic archive selection HREF must not be templated")
+	}
+	u := href.Resolve(nil, nil)
+	raw := u.Raw()
+	decodedPath := u.Path()
+	if raw.IsAbs() || raw.Host != "" || raw.RawQuery != "" || raw.ForceQuery || raw.Fragment != "" {
+		return "", fmt.Errorf("comic archive selection HREF %q must be a relative path without query or fragment", href.String())
+	}
+	if decodedPath == "" || strings.HasPrefix(decodedPath, "/") || strings.Contains(decodedPath, "\\") || strings.Contains(decodedPath, "//") {
+		return "", fmt.Errorf("comic archive selection HREF %q is not a normalized relative path", href.String())
+	}
+	cleaned := pathpkg.Clean(decodedPath)
+	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, "../") || cleaned != decodedPath {
+		return "", fmt.Errorf("comic archive selection HREF %q contains invalid path traversal", href.String())
+	}
+	canonical, err := url.URLFromDecodedPath(decodedPath)
+	if err != nil {
+		return "", fmt.Errorf("failed normalizing comic archive selection HREF %q: %w", href.String(), err)
+	}
+	return canonical.String(), nil
+}
+
+func selectComicArchiveReadingOrder(discovered manifest.LinkList, requested []manifest.HREF) (manifest.LinkList, error) {
+	if len(requested) == 0 {
+		return nil, errors.New("comic archive reading order selection must not be empty")
+	}
+
+	byHREF := make(map[string]manifest.Link, len(discovered))
+	for _, link := range discovered {
+		canonical, err := canonicalComicArchiveHREF(link.Href)
+		if err != nil {
+			return nil, err
+		}
+		byHREF[canonical] = link
+	}
+
+	selected := make(manifest.LinkList, 0, len(requested))
+	seen := make(map[string]struct{}, len(requested))
+	for _, href := range requested {
+		canonical, err := canonicalComicArchiveHREF(href)
+		if err != nil {
+			return nil, err
+		}
+		if _, duplicate := seen[canonical]; duplicate {
+			return nil, fmt.Errorf("comic archive reading order selection contains duplicate HREF %q", canonical)
+		}
+		link, exists := byHREF[canonical]
+		if !exists {
+			return nil, fmt.Errorf("comic archive reading order selection contains unknown HREF %q", canonical)
+		}
+		seen[canonical] = struct{}{}
+		selected = append(selected, link)
+	}
+	return selected, nil
 }
 
 func comicArchiveTableOfContents(readingOrder manifest.LinkList) manifest.LinkList {
