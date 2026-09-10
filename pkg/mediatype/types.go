@@ -50,6 +50,7 @@ var ReadiumContentDocument, _ = New("application/vnd.readium.content+json", "Rea
 var ReadiumDivina, _ = New("application/divina+zip", "Digital Visual Narratives", "divina")
 var ReadiumDivinaManifest, _ = New("application/divina+json", "Digital Visual Narratives", "json")
 var ReadiumGuidedNavigationDocument, _ = New("application/guided-navigation+json", "Readium Guided Navigation Document", "")
+var ReadiumLocatorsJSON, _ = New("application/vnd.readium.locators+json", "Readium Locator Collection", "")
 var ReadiumPositionList, _ = New("application/vnd.readium.position-list+json", "Readium Position List", "")
 var ReadiumWebpub, _ = New("application/webpub+zip", "Readium Web Publication", "webpub")
 var ReadiumWebpubManifest, _ = New("application/webpub+json", "Readium Web Publication", "json")

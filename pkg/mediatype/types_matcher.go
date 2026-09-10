@@ -51,6 +51,7 @@ var knownMatches = map[string]*MediaType{
 	"application/divina+zip":                               &ReadiumDivina,
 	"application/divina+json":                              &ReadiumDivinaManifest,
 	"application/guided-navigation+json":                   &ReadiumGuidedNavigationDocument,
+	"application/vnd.readium.locators+json":                &ReadiumLocatorsJSON,
 	"application/vnd.readium.position-list+json":           &ReadiumPositionList,
 	"application/webpub+zip":                               &ReadiumWebpub,
 	"application/webpub+json":                              &ReadiumWebpubManifest,

@@ -82,6 +82,7 @@ func (p Parser) Parse(ctx context.Context, asset asset.PublicationAsset, f fetch
 
 	builder := pub.NewServicesBuilder(map[pub.ServiceName]pub.ServiceFactory{
 		pub.PositionsService_Name: PositionsServiceFactory(p.reflowablePositionsStrategy),
+		pub.SearchService_Name:    SearchServiceFactory(),
 		// The guided navigation service replaces the content service
 		// pub.ContentService_Name: pub.DefaultContentServiceFactory([]iterator.ResourceContentIteratorFactory{
 		// 	iterator.HTMLFactory(),
