@@ -10,7 +10,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
+	"github.com/nohles/go-toolkit/pkg/analyzer"
 	"github.com/nohles/go-toolkit/pkg/asset"
 	"github.com/nohles/go-toolkit/pkg/fetcher"
 	"github.com/nohles/go-toolkit/pkg/internal/extensions"
@@ -25,6 +27,7 @@ import (
 // It can also work for a standalone bitmap file.
 type ImageParser struct {
 	comicArchiveReadingOrder []manifest.HREF
+	dimensionProbes          int
 }
 
 type Option func(*ImageParser)
@@ -35,6 +38,18 @@ func WithComicArchiveReadingOrder(hrefs ...manifest.HREF) Option {
 	return func(parser *ImageParser) {
 		parser.comicArchiveReadingOrder = make([]manifest.HREF, len(hrefs))
 		copy(parser.comicArchiveReadingOrder, hrefs)
+	}
+}
+
+// WithDimensionProbing enables probing the pixel dimensions of reading-order
+// bitmaps during parsing, filling each link's width/height so readers can
+// reserve layout space without decoding pages. Only image headers are read
+// (see analyzer.ProbeImageDimensions), with at most `workers` probes running
+// concurrently. Probing failures never fail parsing; affected links simply
+// keep no dimensions.
+func WithDimensionProbing(workers int) Option {
+	return func(parser *ImageParser) {
+		parser.dimensionProbes = workers
 	}
 }
 
@@ -104,6 +119,8 @@ func (p ImageParser) parseImagePublication(ctx context.Context, asset asset.Publ
 	// First valid resource is the cover.
 	readingOrder[0].Rels = []string{"cover"}
 
+	p.probeReadingOrderDimensions(ctx, fetcher, readingOrder)
+
 	manifest := manifest.Manifest{
 		Context: manifest.Strings{manifest.WebpubManifestContext},
 		Metadata: manifest.Metadata{
@@ -119,10 +136,59 @@ func (p ImageParser) parseImagePublication(ctx context.Context, asset asset.Publ
 	return pub.NewBuilder(manifest, fetcher, builder), nil
 }
 
+// probeReadingOrderDimensions fills in the width/height of every bitmap link
+// in the reading order, using a bounded pool of concurrent probes.
+func (p ImageParser) probeReadingOrderDimensions(ctx context.Context, fetcher fetcher.Fetcher, readingOrder manifest.LinkList) {
+	if p.dimensionProbes <= 0 {
+		return
+	}
+	sem := make(chan struct{}, p.dimensionProbes)
+	var wg sync.WaitGroup
+	for i := range readingOrder {
+		link := readingOrder[i]
+		if link.MediaType == nil || !link.MediaType.IsBitmap() || (link.Width > 0 && link.Height > 0) {
+			continue
+		}
+		select {
+		case <-ctx.Done():
+			wg.Wait()
+			return
+		case sem <- struct{}{}:
+		}
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			width, height, err := probeLinkDimensions(ctx, fetcher, readingOrder[index])
+			if err == nil {
+				readingOrder[index].Width = width
+				readingOrder[index].Height = height
+			}
+		}(i)
+	}
+	wg.Wait()
+}
+
+func probeLinkDimensions(ctx context.Context, f fetcher.Fetcher, link manifest.Link) (uint, uint, error) {
+	resource := f.Get(ctx, link)
+	defer resource.Close()
+	read := func(n int64) ([]byte, error) {
+		data, rerr := resource.Read(ctx, 0, n-1)
+		if rerr != nil {
+			return nil, fmt.Errorf("failed reading %s: %w", link.Href.String(), rerr)
+		}
+		return data, nil
+	}
+	width, height, err := analyzer.ProbeImageDimensions(read)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed probing dimensions of %s: %w", link.Href.String(), err)
+	}
+	return width, height, nil
+}
+
 var allowed_extensions_image = map[string]struct{}{"acbf": {}, "xml": {}, "txt": {}, "json": {}}
 
-func (p ImageParser) accepts(ctx context.Context, asset asset.PublicationAsset, fetcher fetcher.Fetcher) (bool, error) {
-	if asset.MediaType(ctx).IsComicArchive() {
+func (p ImageParser) accepts(ctx context.Context, asset asset.PublicationAsset, fetcher fetcher.Fetcher) (bool, error) {	if asset.MediaType(ctx).IsComicArchive() {
 		return true, nil
 	}
 	links, err := fetcher.Links(ctx)

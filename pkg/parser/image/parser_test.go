@@ -249,8 +249,50 @@ func TestImageComicArchiveFolderRejectsUnsupportedEntries(t *testing.T) {
 	assert.Nil(t, builder)
 }
 
-func TestImageCoverFirstItem(t *testing.T) {
+func withImageParserOptions(t *testing.T, filepath string, options []Option, f func(*pub.Builder)) {
+	t.Helper()
+	u, _ := url.FromFilepath(filepath)
+	a := asset.File(u)
+	fet, err := a.CreateFetcher(t.Context(), asset.Dependencies{
+		ArchiveFactory: archive.NewArchiveFactory(),
+	}, "")
+	require.NoError(t, err)
+	p, err := NewParser(options...).Parse(t.Context(), a, fet)
+	require.NoError(t, err)
+	f(p)
+}
+
+func TestImageDimensionProbingDisabledByDefault(t *testing.T) {
 	withImageParser(t, "./testdata/image/futuristic_tales.cbz", func(p *pub.Builder) {
+		require.NotNil(t, p)
+		publication := p.Build()
+		require.NotNil(t, publication)
+		require.NotEmpty(t, publication.Manifest.ReadingOrder)
+
+		for _, link := range publication.Manifest.ReadingOrder {
+			assert.Zero(t, link.Width, "width should not be probed by default: %s", link.Href.String())
+			assert.Zero(t, link.Height, "height should not be probed by default: %s", link.Href.String())
+		}
+	})
+}
+
+func TestImageDimensionProbingFillsWidthAndHeight(t *testing.T) {
+	withImageParserOptions(t, "./testdata/image/futuristic_tales.cbz",
+		[]Option{WithDimensionProbing(4)},
+		func(p *pub.Builder) {
+			require.NotNil(t, p)
+			publication := p.Build()
+			require.NotNil(t, publication)
+			require.NotEmpty(t, publication.Manifest.ReadingOrder)
+
+			for _, link := range publication.Manifest.ReadingOrder {
+				assert.Positive(t, link.Width, "width should be probed: %s", link.Href.String())
+				assert.Positive(t, link.Height, "height should be probed: %s", link.Href.String())
+			}
+		})
+}
+
+func TestImageCoverFirstItem(t *testing.T) {	withImageParser(t, "./testdata/image/futuristic_tales.cbz", func(p *pub.Builder) {
 		require.NotNil(t, p)
 		pub := p.Build()
 		require.NotNil(t, pub)
