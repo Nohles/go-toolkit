@@ -112,6 +112,17 @@ func (e *gozipArchiveEntry) Read(start int64, end int64) ([]byte, error) {
 		start = 0
 	}
 
+	// Clamp before allocating or opening a decompressor. Header probes often
+	// request more bytes than exist; retaining that full requested capacity wastes
+	// memory even though ReadFull returns only the short entry's bytes.
+	if !(start == 0 && end == 0) && e.file.UncompressedSize64 <= math.MaxInt64 {
+		size := int64(e.file.UncompressedSize64)
+		if start >= size {
+			return []byte{}, io.EOF
+		}
+		end = min(end, size-1)
+	}
+
 	minimizeReads := e.couldMinimizeReads()
 
 	var f io.Reader
@@ -288,7 +299,7 @@ func (e *gozipArchiveEntry) Stream(w io.Writer, start int64, end int64) (int64, 
 	}
 
 	if start == 0 && end == 0 {
-		n, err := copyRange(w, f, int64(e.file.UncompressedSize64))
+		n, err := e.copyRange(w, f, int64(e.file.UncompressedSize64))
 		if err == io.EOF {
 			err = nil
 		}
@@ -303,7 +314,7 @@ func (e *gozipArchiveEntry) Stream(w io.Writer, start int64, end int64) (int64, 
 			return n, err
 		}
 	}
-	n, err := copyRange(w, f, end-start+1)
+	n, err := e.copyRange(w, f, end-start+1)
 	if n > 0 && err == io.EOF {
 		// Not EOF error if some data was read
 		err = nil
@@ -339,11 +350,17 @@ func copyBufferSize(length int64) int {
 // reads the source in its own small chunks — and every read of a remote
 // archive can be its own range request. io.ReadFull guarantees each iteration
 // asks the underlying reader for the whole buffer at once.
-func copyRange(w io.Writer, r io.Reader, length int64) (int64, error) {
+func (e *gozipArchiveEntry) copyRange(w io.Writer, r io.Reader, length int64) (int64, error) {
 	if length <= 0 {
 		return 0, nil
 	}
-	buf := make([]byte, copyBufferSize(length))
+	bufferSize := copyBufferSize(length)
+	if !e.minimizeReads {
+		// Large remote chunks amortize network range requests, but local reads need
+		// only a modest buffer and should reach the client without filling 2 MiB.
+		bufferSize = min(bufferSize, 32<<10)
+	}
+	buf := make([]byte, bufferSize)
 	var written int64
 	for written < length {
 		n := int64(len(buf))
