@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/nohles/go-toolkit/pkg/manifest"
@@ -226,4 +227,36 @@ func TestFileFetcherLinksSkipsHiddenFiles(t *testing.T) {
 		Href:      manifest.MustNewHREFFromString("dir_href/text.txt", false),
 		MediaType: &mediatype.Text,
 	}}, links)
+}
+
+func TestFileFetcherClosedResourcesDoNotAccumulate(t *testing.T) {
+	f := NewFileFetcher("file_href", "./testdata/text.txt")
+	defer f.Close()
+	for range 256 {
+		resource := f.Get(t.Context(), manifest.Link{Href: manifest.MustNewHREFFromString("file_href", false)})
+		_, err := resource.Length(t.Context())
+		require.Nil(t, err)
+		resource.Close()
+	}
+	require.LessOrEqual(t, len(f.resources), 1, "closed request resources accumulated for the publication's lifetime")
+}
+
+func TestFileFetcherConcurrentRequestLifecycle(t *testing.T) {
+	f := NewFileFetcher("file_href", "./testdata/text.txt")
+	var wg sync.WaitGroup
+	for range 16 {
+		wg.Go(func() {
+			for range 32 {
+				resource := f.Get(t.Context(), manifest.Link{Href: manifest.MustNewHREFFromString("file_href", false)})
+				_, err := resource.Read(t.Context(), 0, 1)
+				if err != nil {
+					t.Errorf("resource read: %v", err)
+				}
+				resource.Close()
+			}
+		})
+	}
+	wg.Wait()
+	f.Close()
+	require.Empty(t, f.resources)
 }

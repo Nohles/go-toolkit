@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"weak"
 
 	"github.com/nohles/go-toolkit/pkg/manifest"
@@ -19,7 +20,9 @@ import (
 // Provides access to resources on the local file system.
 type FileFetcher struct {
 	paths     map[string]string
+	mu        sync.Mutex // protects resource tracking and the fetcher's closed state
 	resources []weak.Pointer[FileResource]
+	closed    bool
 }
 
 // Links implements Fetcher
@@ -115,7 +118,23 @@ func (f *FileFetcher) Get(ctx context.Context, link manifest.Link) Resource {
 			sep := string(filepath.Separator)
 			if rapath == iapath || strings.HasPrefix(rapath, strings.TrimSuffix(iapath, sep)+sep) {
 				resource := NewFileResource(link, resourceFile)
-				f.resources = append(f.resources, weak.Make(resource))
+				f.mu.Lock()
+				if f.closed {
+					f.mu.Unlock()
+					return NewFailureResource(link, Other(os.ErrClosed))
+				}
+				// Only live, unclosed resources need the publication's safety cleanup.
+				// Repeated requests must not grow a ten-minute publication's weak list.
+				n := 0
+				for _, ref := range f.resources {
+					if live := ref.Value(); live != nil && !live.closed.Load() {
+						f.resources[n] = ref
+						n++
+					}
+				}
+				clear(f.resources[n:])
+				f.resources = append(f.resources[:n], weak.Make(resource))
+				f.mu.Unlock()
 				return resource
 			}
 		}
@@ -135,13 +154,19 @@ func fileFetcherHrefCandidates(linkHref string, itemHref string) []string {
 
 // Close implements Fetcher
 func (f *FileFetcher) Close() {
+	// Detach under the tracking lock, then close each resource without holding
+	// that lock. Get cannot register new resources after publication shutdown.
+	f.mu.Lock()
+	resources := f.resources
+	f.resources = nil
+	f.closed = true
+	f.mu.Unlock()
 	// Safety mechanism to cleanup any os.File handles still open
-	for _, res := range f.resources {
+	for _, res := range resources {
 		if r := res.Value(); r != nil {
 			r.Close()
 		}
 	}
-	f.resources = nil
 }
 
 func NewFileFetcher(href string, fpath string) *FileFetcher {
@@ -154,8 +179,9 @@ type FileResource struct {
 	link manifest.Link
 	path string
 
-	mu   sync.Mutex // guards lazily opening and closing file
-	file *os.File
+	mu     sync.Mutex // guards lazily opening and closing file
+	file   *os.File
+	closed atomic.Bool // lets the fetcher prune without nesting resource locks
 }
 
 // Link implements Resource
@@ -172,6 +198,7 @@ func (r *FileResource) Properties() manifest.Properties {
 func (r *FileResource) Close() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.closed.Store(true)
 	if r.file != nil {
 		r.file.Close()
 	}
@@ -188,6 +215,9 @@ func (r *FileResource) File() string {
 func (r *FileResource) open() (*os.File, *ResourceError) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.closed.Load() {
+		return nil, Other(os.ErrClosed)
+	}
 	if r.file != nil {
 		return r.file, nil
 	}
@@ -197,9 +227,11 @@ func (r *FileResource) open() (*os.File, *ResourceError) {
 	}
 	stat, err := f.Stat()
 	if err != nil {
+		f.Close()
 		return nil, Other(err)
 	}
 	if stat.IsDir() {
+		f.Close()
 		return nil, NotFound(errors.New("is a directory"))
 	}
 	r.file = f

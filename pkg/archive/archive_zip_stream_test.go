@@ -6,6 +6,7 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -186,5 +187,56 @@ func TestZipStreamCompressedGzip(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, gr.Close())
 		assert.True(t, bytes.Equal(deflatePayload, gunzipped))
+	})
+}
+
+// Header probes commonly request 64 KiB from a much shorter image. The result
+// must neither retain a requested-size buffer nor allocate arbitrary range size.
+func TestZipReadClampsAllocationToEntryLength(t *testing.T) {
+	withStreamTestArchives(t, func(t *testing.T, a Archive) {
+		for name, content := range map[string][]byte{storedName: storedPayload, deflateName: deflatePayload} {
+			entry, err := a.Entry(name)
+			require.NoError(t, err)
+			data, err := entry.Read(0, 4<<20)
+			require.NoError(t, err)
+			require.Equal(t, content, data)
+			require.LessOrEqual(t, cap(data), len(content), "range allocation exceeded the actual entry")
+		}
+	})
+}
+
+func TestZipReadHugeRangeAndPastEnd(t *testing.T) {
+	withStreamTestArchives(t, func(t *testing.T, a Archive) {
+		entry, err := a.Entry(storedName)
+		require.NoError(t, err)
+		data, err := entry.Read(0, math.MaxInt64)
+		require.NoError(t, err)
+		require.Equal(t, storedPayload, data)
+		data, err = entry.Read(int64(len(storedPayload)), math.MaxInt64)
+		require.ErrorIs(t, err, io.EOF)
+		require.Empty(t, data)
+	})
+}
+
+type chunkWriter struct {
+	max   int
+	total int64
+}
+
+func (w *chunkWriter) Write(p []byte) (int, error) {
+	w.max = max(w.max, len(p))
+	w.total += int64(len(p))
+	return len(p), nil
+}
+func TestZipLocalDeflateStreamsSmallChunks(t *testing.T) {
+	withStreamTestArchives(t, func(t *testing.T, a Archive) {
+		entry, err := a.Entry(deflateName)
+		require.NoError(t, err)
+		w := &chunkWriter{}
+		n, err := entry.Stream(w, 0, 0)
+		require.NoError(t, err)
+		require.EqualValues(t, len(deflatePayload), n)
+		require.Equal(t, n, w.total)
+		require.LessOrEqual(t, w.max, 32<<10)
 	})
 }
