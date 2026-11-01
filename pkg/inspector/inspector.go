@@ -22,7 +22,7 @@ import (
 	readiumaudio "github.com/nohles/go-toolkit/pkg/parser/audio"
 )
 
-const ExtractorVersion = "reader-inspector-v1"
+const ExtractorVersion = "reader-inspector-v3"
 
 const (
 	maxArchiveEntries   = 100_000
@@ -272,14 +272,8 @@ func applyEPUBMetadata(out map[string]any, pkg opfPackage) {
 		out["releaseDate"] = v
 	}
 	for _, id := range pkg.Metadata.Identifiers {
-		n := strings.ToUpper(strings.Map(func(r rune) rune {
-			if (r >= '0' && r <= '9') || r == 'X' || r == 'x' {
-				return r
-			}
-			return -1
-		}, strings.TrimPrefix(strings.TrimSpace(id), "urn:isbn:")))
-		if len(n) == 10 || len(n) == 13 {
-			out["isbn"] = n
+		if isbn := normalizedISBN(id); isbn != "" {
+			out["isbn"] = isbn
 			break
 		}
 	}
@@ -419,13 +413,33 @@ func inspectAudio(req Request, result *Result) error {
 			raw := m.Raw()
 			title := first([]string{m.Album(), m.Title()})
 			put(result.Metadata, "title", title)
-			if a := strings.TrimSpace(m.Artist()); a != "" {
-				result.Metadata["authors"] = split(a)
+			narrators := splitPeople(rawString(raw, "narrator", "performer", "conductor"))
+			if len(narrators) > 0 {
+				result.Metadata["narrators"] = narrators
 			}
-			if n := strings.TrimSpace(m.AlbumArtist()); n != "" && n != strings.TrimSpace(m.Artist()) {
-				result.Metadata["narrators"] = split(n)
-			} else if n := rawString(raw, "narrator", "performer", "conductor"); n != "" {
-				result.Metadata["narrators"] = split(n)
+			// Explicit author tags are more reliable than the ambiguous artist fields.
+			authors := splitPeople(rawString(raw, "author", "writer"))
+			if len(authors) == 0 {
+				for _, value := range []string{m.Artist(), m.AlbumArtist(), m.Composer()} {
+					for _, name := range splitPeople(value) {
+						isNarrator := false
+						for _, narrator := range narrators {
+							if strings.EqualFold(name, narrator) {
+								isNarrator = true
+								break
+							}
+						}
+						if !isNarrator {
+							authors = append(authors, name)
+						}
+					}
+					if len(authors) > 0 {
+						break
+					}
+				}
+			}
+			if len(authors) > 0 {
+				result.Metadata["authors"] = authors
 			}
 			description := first([]string{m.Comment(), rawString(raw, "description", "summary")})
 			put(result.Metadata, "description", description)
@@ -496,18 +510,47 @@ func clean(values []string) []string {
 func split(value string) []string {
 	return clean(strings.FieldsFunc(value, func(r rune) bool { return r == ',' || r == ';' || r == '|' || r == '/' }))
 }
+
+// A comma may be part of a surname-first name; leave it intact unless a
+// less ambiguous list separator is present.
+func splitPeople(value string) []string {
+	return clean(strings.FieldsFunc(value, func(r rune) bool { return r == ';' || r == '|' || r == '/' }))
+}
+
 func put(out map[string]any, key, value string) {
 	if value = strings.TrimSpace(value); value != "" {
 		out[key] = value
 	}
 }
 func rawString(raw map[string]any, keys ...string) string {
+	// ID3 user text frames are stored as TXXX, TXXX_0, ... with the actual
+	// field name in the description, rather than under that name in Raw().
+	rawKeys := make([]string, 0, len(raw))
+	for key := range raw {
+		rawKeys = append(rawKeys, key)
+	}
+	sort.Strings(rawKeys)
 	for _, key := range keys {
-		for rawKey, value := range raw {
+		for _, rawKey := range rawKeys {
+			value := raw[rawKey]
 			if strings.EqualFold(rawKey, key) {
-				if text, ok := value.(string); ok {
-					if text = strings.TrimSpace(text); text != "" {
-						return text
+				if text, ok := value.(string); ok && strings.Trim(text, "\x00 \t\r\n") != "" {
+					return strings.Trim(text, "\x00 \t\r\n")
+				}
+			}
+			if strings.EqualFold(rawKey, "TXXX") || strings.HasPrefix(strings.ToUpper(rawKey), "TXXX_") || strings.EqualFold(rawKey, "TXX") {
+				switch frame := value.(type) {
+				case *tag.Comm:
+					if frame != nil && strings.EqualFold(strings.Trim(frame.Description, "\x00 \t\r\n"), key) {
+						if text := strings.Trim(frame.Text, "\x00 \t\r\n"); text != "" {
+							return text
+						}
+					}
+				case tag.Comm:
+					if strings.EqualFold(strings.Trim(frame.Description, "\x00 \t\r\n"), key) {
+						if text := strings.Trim(frame.Text, "\x00 \t\r\n"); text != "" {
+							return text
+						}
 					}
 				}
 			}
@@ -516,17 +559,58 @@ func rawString(raw map[string]any, keys ...string) string {
 	return ""
 }
 func normalizedISBN(value string) string {
-	normalized := strings.ToUpper(strings.Map(func(r rune) rune {
-		if (r >= '0' && r <= '9') || r == 'x' || r == 'X' {
-			return r
+	value = strings.TrimSpace(value)
+	if len(value) >= len("urn:isbn:") && strings.EqualFold(value[:len("urn:isbn:")], "urn:isbn:") {
+		value = value[len("urn:isbn:"):]
+	}
+	var b strings.Builder
+	for _, r := range value {
+		switch {
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == 'x' || r == 'X':
+			b.WriteByte('X')
+		case r == '-' || r == ' ' || r == '\t':
+		default:
+			return ""
 		}
-		return -1
-	}, strings.TrimPrefix(strings.TrimSpace(value), "urn:isbn:")))
-	if len(normalized) == 10 || len(normalized) == 13 {
-		return normalized
+	}
+	n := b.String()
+	if len(n) == 10 {
+		sum := 0
+		for i, c := range n {
+			if c == 'X' && i == 9 {
+				sum += 10
+				continue
+			}
+			if c < '0' || c > '9' {
+				return ""
+			}
+			sum += int(c-'0') * (10 - i)
+		}
+		if sum%11 == 0 {
+			return n
+		}
+	}
+	if len(n) == 13 && (strings.HasPrefix(n, "978") || strings.HasPrefix(n, "979")) {
+		sum := 0
+		for i, c := range n {
+			if c < '0' || c > '9' {
+				return ""
+			}
+			weight := 1
+			if i%2 == 1 {
+				weight = 3
+			}
+			sum += int(c-'0') * weight
+		}
+		if sum%10 == 0 {
+			return n
+		}
 	}
 	return ""
 }
+
 func isImage(name string) bool {
 	switch strings.ToLower(path.Ext(name)) {
 	case ".jpg", ".jpeg", ".png", ".webp", ".gif":
