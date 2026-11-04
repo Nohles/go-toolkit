@@ -278,8 +278,13 @@ func probeMP3Duration(ctx context.Context, res fetcher.Resource, size int64) flo
 				flags := binary.BigEndian.Uint32(frame[xingOff+4 : xingOff+8])
 				if flags&0x01 != 0 && xingOff+12 <= len(frame) {
 					frames := binary.BigEndian.Uint32(frame[xingOff+8 : xingOff+12])
-					if frames > 0 {
-						return float64(frames) * float64(samplesPerFrame) / float64(sampleRate)
+					declared := float64(frames) * float64(samplesPerFrame) / float64(sampleRate)
+					var declaredBytes uint32
+					if flags&0x02 != 0 && xingOff+16 <= len(frame) {
+						declaredBytes = binary.BigEndian.Uint32(frame[xingOff+12 : xingOff+16])
+					}
+					if frames > 0 && mp3HeaderDescribesFile(declared, declaredBytes, size-frameStart) {
+						return declared
 					}
 				}
 			}
@@ -305,6 +310,26 @@ func probeMP3Duration(ctx context.Context, res fetcher.Resource, size int64) flo
 	}
 	return float64(audioBytes) * 8 / (float64(bitrate) * 1000)
 }
+
+// mp3HeaderDescribesFile reports whether a Xing/Info header can be describing the
+// whole file. Joining MP3s leaves the first part's header in place, which would
+// report a 20 hour book as 22 minutes, so a header is ignored when it counts
+// noticeably fewer bytes than the file holds or implies an impossible bitrate.
+func mp3HeaderDescribesFile(seconds float64, declaredBytes uint32, audioBytes int64) bool {
+	if audioBytes <= 0 || seconds <= 0 {
+		return false
+	}
+	if declaredBytes > 0 && float64(audioBytes) > float64(declaredBytes)*mp3HeaderSizeTolerance {
+		return false
+	}
+	return float64(audioBytes)*8/seconds <= mp3MaxBitsPerSecond
+}
+
+// A tag or padding after the audio can account for some of the difference.
+const mp3HeaderSizeTolerance = 1.1
+
+// The highest bitrate any MPEG audio layer defines is 448 kbps.
+const mp3MaxBitsPerSecond = 448_000
 
 func parseMP3Header(b []byte) []byte {
 	if len(b) < 4 || b[0] != 0xFF || b[1]&0xE0 != 0xE0 {
