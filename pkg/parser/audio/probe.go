@@ -48,6 +48,9 @@ func probeAudioFile(ctx context.Context, res fetcher.Resource, link manifest.Lin
 		result.Duration = probeAIFFDuration(ctx, res, size)
 	case familyMP3:
 		result.Duration = probeMP3Duration(ctx, res, size)
+		if extractChapters {
+			result.Chapters = id3Chapters(ctx, res)
+		}
 	case familyWebM:
 		result.Duration = probeWebMDuration(ctx, res, size)
 	case familyAAC:

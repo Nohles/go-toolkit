@@ -28,7 +28,6 @@ const defaultProbeConcurrency = 8
 func (p AudioParser) enrich(ctx context.Context, fetch fetcher.Fetcher, m *manifest.Manifest) (pub.ServiceFactory, map[string]*retainedCache) {
 	var firstTags *audioTags
 	var totalDuration float64
-	var embeddedChapters manifest.LinkList
 
 	readingOrder := m.ReadingOrder
 
@@ -62,6 +61,7 @@ func (p AudioParser) enrich(ctx context.Context, fetch fetcher.Fetcher, m *manif
 	_ = g.Wait()
 
 	// Combine the results in reading order so the output is deterministic.
+	fileChapters := make([]manifest.LinkList, len(readingOrder))
 	var caches map[string]*retainedCache
 	for i := range readingOrder {
 		link := readingOrder[i]
@@ -84,9 +84,7 @@ func (p AudioParser) enrich(ctx context.Context, fetch fetcher.Fetcher, m *manif
 		if p.tags != nil && p.tags.Title != "" {
 			link.Title = p.tags.Title
 		}
-		if len(p.probe.Chapters) > 0 {
-			embeddedChapters = append(embeddedChapters, chaptersToLinks(p.probe.Chapters, link)...)
-		}
+		fileChapters[i] = chaptersToLinks(p.probe.Chapters, link)
 
 		readingOrder[i] = link
 		if i == 0 {
@@ -101,6 +99,7 @@ func (p AudioParser) enrich(ctx context.Context, fetch fetcher.Fetcher, m *manif
 	}
 
 	applyTagsToMetadata(&m.Metadata, firstTags)
+	embeddedChapters := combineFileChapters(fileChapters, readingOrder)
 
 	// Table of contents priority: a playlist file wins over embedded chapters,
 	// which in turn win over a flat per-file listing.
@@ -116,6 +115,37 @@ func (p AudioParser) enrich(ctx context.Context, fetch fetcher.Fetcher, m *manif
 		return coverServiceFactory(firstTags.Picture), caches
 	}
 	return nil, caches
+}
+
+// combineFileChapters lists each file's chapters in reading order, or nil when no
+// file has any. A file without chapters still gets an entry when another has them,
+// or the table of contents would skip it.
+func combineFileChapters(fileChapters []manifest.LinkList, readingOrder manifest.LinkList) manifest.LinkList {
+	any := false
+	for _, chapters := range fileChapters {
+		any = any || len(chapters) > 0
+	}
+	if !any {
+		return nil
+	}
+	var combined manifest.LinkList
+	for i, chapters := range fileChapters {
+		if len(chapters) > 0 {
+			// A chapter running over from the last file is marked again at this
+			// file's start under the same title. It is one chapter.
+			if n := len(combined); n > 0 && combined[n-1].Title == chapters[0].Title && chapters[0].URL(nil, nil).Fragment() == "" {
+				chapters = chapters[1:]
+			}
+			combined = append(combined, chapters...)
+			continue
+		}
+		title := readingOrder[i].Title
+		if title == "" {
+			title = readingOrder[i].URL(nil, nil).Filename()
+		}
+		combined = append(combined, chapterLink(readingOrder[i], title, 0))
+	}
+	return combined
 }
 
 // probedItem is the per-file result of the parallel probing pass.
