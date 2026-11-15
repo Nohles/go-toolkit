@@ -56,6 +56,27 @@ func TestInspectComicHonorsFrontCoverAndZipDisguisedAsCBR(t *testing.T) {
 	require.Equal(t, "002.jpg", result.Cover.Locator)
 }
 
+func TestInspectComicReportsMangaDirectionAndFormat(t *testing.T) {
+	filePath := writeZIP(t, "volume.cbz", map[string][]byte{
+		"ComicInfo.xml": []byte(`<ComicInfo><Manga>YesAndRightToLeft</Manga><Format>Webtoon</Format></ComicInfo>`),
+		"001.png":       tinyPNG,
+	})
+	result, err := Inspect(Request{FilePath: filePath, MediaKind: "comics", IncludeMetadata: true})
+	require.NoError(t, err)
+	require.Equal(t, true, result.Metadata["manga"])
+	require.Equal(t, "rtl", result.Metadata["readingDirection"])
+	require.Equal(t, "Webtoon", result.Metadata["format"])
+
+	plain := writeZIP(t, "plain.cbz", map[string][]byte{
+		"ComicInfo.xml": []byte(`<ComicInfo><Manga>Yes</Manga></ComicInfo>`),
+		"001.png":       tinyPNG,
+	})
+	result, err = Inspect(Request{FilePath: plain, MediaKind: "comics", IncludeMetadata: true})
+	require.NoError(t, err)
+	require.Equal(t, true, result.Metadata["manga"])
+	require.NotContains(t, result.Metadata, "readingDirection")
+}
+
 func TestInspectRealCBRIsUnsupported(t *testing.T) {
 	filePath := filepath.Join(t.TempDir(), "issue.cbr")
 	require.NoError(t, os.WriteFile(filePath, []byte("Rar!not-a-zip"), 0o600))

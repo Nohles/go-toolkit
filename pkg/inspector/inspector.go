@@ -298,6 +298,8 @@ type comicInfo struct {
 	Series    string `xml:"Series"`
 	Volume    string `xml:"Volume"`
 	Web       string `xml:"Web"`
+	Manga     string `xml:"Manga"`
+	Format    string `xml:"Format"`
 	Pages     []struct {
 		Image int    `xml:"Image,attr"`
 		Type  string `xml:"Type,attr"`
@@ -370,6 +372,16 @@ func applyComicMetadata(out map[string]any, c comicInfo) {
 	put(out, "series", c.Series)
 	put(out, "volume", c.Volume)
 	put(out, "web", c.Web)
+	put(out, "format", c.Format)
+	// ComicInfo's Manga field: "Yes" marks manga, "YesAndRightToLeft" marks
+	// manga read right to left. "No" and "Unknown" say nothing either way.
+	switch strings.ToLower(strings.TrimSpace(c.Manga)) {
+	case "yesandrighttoleft":
+		out["manga"] = true
+		out["readingDirection"] = "rtl"
+	case "yes":
+		out["manga"] = true
+	}
 	if c.PageCount > 0 {
 		out["pageCount"] = c.PageCount
 	}
