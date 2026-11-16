@@ -79,7 +79,7 @@ func (p ImageParser) Parse(ctx context.Context, asset asset.PublicationAsset, fe
 				return nil, err
 			}
 		}
-		return p.parseComicArchivePublication(ctx, asset, fetcher, readingOrder), nil
+		return p.parseComicArchivePublication(ctx, asset, fetcher, links, readingOrder), nil
 	}
 
 	if !acceptsImageLinks(links) {
@@ -128,6 +128,9 @@ func (p ImageParser) parseImagePublication(ctx context.Context, asset asset.Publ
 			ConformsTo:     manifest.Profiles{manifest.ProfileDivina},
 		},
 		ReadingOrder: readingOrder,
+	}
+	if info, ok := readComicInfo(ctx, fetcher, links); ok {
+		applyComicInfo(&manifest, info, true)
 	}
 
 	builder := pub.NewServicesBuilder(map[pub.ServiceName]pub.ServiceFactory{
@@ -223,7 +226,7 @@ func acceptsImageLinks(links manifest.LinkList) bool {
 	return true
 }
 
-func (p ImageParser) parseComicArchivePublication(ctx context.Context, asset asset.PublicationAsset, fetcher fetcher.Fetcher, readingOrder manifest.LinkList) *pub.Builder {
+func (p ImageParser) parseComicArchivePublication(ctx context.Context, asset asset.PublicationAsset, fetcher fetcher.Fetcher, links manifest.LinkList, readingOrder manifest.LinkList) *pub.Builder {
 	title := parser.GuessPublicationTitleFromFileStructure(ctx, fetcher)
 	if title == "" {
 		title = asset.Name()
@@ -237,6 +240,9 @@ func (p ImageParser) parseComicArchivePublication(ctx context.Context, asset ass
 		},
 		ReadingOrder:    readingOrder,
 		TableOfContents: comicArchiveTableOfContents(readingOrder),
+	}
+	if info, ok := readComicInfo(ctx, fetcher, links); ok {
+		applyComicInfo(&manifest, info, false)
 	}
 
 	builder := pub.NewServicesBuilder(map[pub.ServiceName]pub.ServiceFactory{
